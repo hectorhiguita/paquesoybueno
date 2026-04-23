@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Community {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String    @unique
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  users          User[]
+  veredas        Vereda[]
+  categories     Category[]
+  listings       Listing[]
+  ratings        Rating[]
+  messageThreads MessageThread[]
+  messages       Message[]
+  notifications  Notification[]
+  reports        Report[]
+  reservations   Reservation[]
+
+  @@map("communities")
+}
+
+enum UserRole {
+  member
+  admin
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  active
+  locked
+  suspended
+  under_review
+
+  @@map("user_status")
+}
+
+model User {
+  id                  String     @id @default(uuid()) @db.Uuid
+  communityId         String     @map("community_id") @db.Uuid
+  email               String
+  phone               String
+  name                String
+  passwordHash        String?    @map("password_hash")
+  role                UserRole   @default(member)
+  status              UserStatus @default(active) @map("status")
+  isVerifiedProvider  Boolean    @default(false) @map("is_verified_provider")
+  verifiedAt          DateTime? @map("verified_at")
+  verifiedBy          String?   @map("verified_by") @db.Uuid
+  verificationReason  String?   @map("verification_reason")
+  phoneVerified       Boolean   @default(false) @map("phone_verified")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  activeReportCount   Int       @default(0) @map("active_report_count")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  community       Community       @relation(fields: [communityId], references: [id])
+  verifier        User?           @relation("VerifiedBy", fields: [verifiedBy], references: [id])
+  verifiedUsers   User[]          @relation("VerifiedBy")
+  listings        Listing[]
+  ratingsGiven    Rating[]        @relation("RaterRatings")
+  ratingsReceived Rating[]        @relation("ProviderRatings")
+  messagesSent    Message[]
+  notifications   Notification[]
+  reportsFilied   Report[]        @relation("ReporterReports")
+  reservations    Reservation[]
+  veredaFollows   VeredaFollow[]
+  threadAsA       MessageThread[] @relation("ParticipantA")
+  threadAsB       MessageThread[] @relation("ParticipantB")
+
+  @@unique([communityId, email])
+  @@unique([communityId, phone])
+  @@map("users")
+}
+
+model Vereda {
+  id          String  @id @default(uuid()) @db.Uuid
+  communityId String  @map("community_id") @db.Uuid
+  name        String
+  latApprox   Float?  @map("lat_approx")
+  lngApprox   Float?  @map("lng_approx")
+
+  community Community      @relation(fields: [communityId], references: [id])
+  listings  Listing[]
+  follows   VeredaFollow[]
+
+  @@unique([communityId, name])
+  @@map("veredas")
+}
+
+model Category {
+  id          String  @id @default(uuid()) @db.Uuid
+  communityId String  @map("community_id") @db.Uuid
+  name        String
+  icon        String?
+  description String?
+  active      Boolean @default(true)
+
+  community Community @relation(fields: [communityId], references: [id])
+  listings  Listing[]
+
+  @@unique([communityId, name])
+  @@map("categories")
+}
+
+enum ListingType {
+  service
+  sale
+  rent
+  trade
+  tool
+
+  @@map("listing_type")
+}
+
+enum ListingStatus {
+  active
+  inactive
+  flagged
+  pending_review
+
+  @@map("listing_status")
+}
+
+model Listing {
+  id               String        @id @default(uuid()) @db.Uuid
+  communityId      String        @map("community_id") @db.Uuid
+  authorId         String        @map("author_id") @db.Uuid
+  categoryId       String        @map("category_id") @db.Uuid
+  veredaId         String        @map("vereda_id") @db.Uuid
+  title            String
+  description      String
+  type             ListingType
+  status           ListingStatus @default(active)
+  priceCop         Decimal?      @map("price_cop") @db.Decimal(12, 2)
+  tradeDescription String?       @map("trade_description")
+  isFeatured       Boolean       @default(false) @map("is_featured")
+  completedJobs    Int           @default(0) @map("completed_jobs")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  community    Community      @relation(fields: [communityId], references: [id])
+  author       User           @relation(fields: [authorId], references: [id])
+  category     Category       @relation(fields: [categoryId], references: [id])
+  vereda       Vereda         @relation(fields: [veredaId], references: [id])
+  images       ListingImage[]
+  ratings      Rating[]
+  reservations Reservation[]
+  reports      Report[]
+
+  @@map("listings")
+}
+
+model ListingImage {
+  id        String @id @default(uuid()) @db.Uuid
+  listingId String @map("listing_id") @db.Uuid
+  url       String
+  order     Int    @default(0)
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@map("listing_images")
+}
+
+model Rating {
+  id          String   @id @default(uuid()) @db.Uuid
+  communityId String   @map("community_id") @db.Uuid
+  raterId     String   @map("rater_id") @db.Uuid
+  providerId  String   @map("provider_id") @db.Uuid
+  listingId   String?  @map("listing_id") @db.Uuid
+  stars       Int
+  comment     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  community Community @relation(fields: [communityId], references: [id])
+  rater     User      @relation("RaterRatings", fields: [raterId], references: [id])
+  provider  User      @relation("ProviderRatings", fields: [providerId], references: [id])
+  listing   Listing?  @relation(fields: [listingId], references: [id])
+
+  @@map("ratings")
+}
+
+model MessageThread {
+  id            String   @id @default(uuid()) @db.Uuid
+  communityId   String   @map("community_id") @db.Uuid
+  listingId     String?  @map("listing_id") @db.Uuid
+  participantA  String   @map("participant_a") @db.Uuid
+  participantB  String   @map("participant_b") @db.Uuid
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+
+  community Community @relation(fields: [communityId], references: [id])
+  userA     User      @relation("ParticipantA", fields: [participantA], references: [id])
+  userB     User      @relation("ParticipantB", fields: [participantB], references: [id])
+  messages  Message[]
+
+  @@map("message_threads")
+}
+
+model Message {
+  id          String   @id @default(uuid()) @db.Uuid
+  communityId String   @map("community_id") @db.Uuid
+  threadId    String   @map("thread_id") @db.Uuid
+  senderId    String   @map("sender_id") @db.Uuid
+  content     String
+  sentAt      DateTime @default(now()) @map("sent_at")
+  delivered   Boolean  @default(false)
+
+  community Community     @relation(fields: [communityId], references: [id])
+  thread    MessageThread @relation(fields: [threadId], references: [id])
+  sender    User          @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model Notification {
+  id          String   @id @default(uuid()) @db.Uuid
+  communityId String   @map("community_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  type        String
+  payload     Json     @default("{}")
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at")
+
+  community Community @relation(fields: [communityId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+enum ReportStatus {
+  pending
+  resolved
+  dismissed
+
+  @@map("report_status")
+}
+
+model Report {
+  id             String       @id @default(uuid()) @db.Uuid
+  communityId    String       @map("community_id") @db.Uuid
+  reporterId     String       @map("reporter_id") @db.Uuid
+  targetListingId String?     @map("target_listing_id") @db.Uuid
+  targetUserId   String?      @map("target_user_id") @db.Uuid
+  reason         String
+  status         ReportStatus @default(pending)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  resolvedAt     DateTime?    @map("resolved_at")
+
+  community     Community @relation(fields: [communityId], references: [id])
+  reporter      User      @relation("ReporterReports", fields: [reporterId], references: [id])
+  targetListing Listing?  @relation(fields: [targetListingId], references: [id])
+
+  @@map("reports")
+}
+
+enum ReservationStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+
+  @@map("reservation_status")
+}
+
+model Reservation {
+  id            String            @id @default(uuid()) @db.Uuid
+  communityId   String            @map("community_id") @db.Uuid
+  toolListingId String            @map("tool_listing_id") @db.Uuid
+  requesterId   String            @map("requester_id") @db.Uuid
+  startDate     DateTime          @map("start_date") @db.Date
+  endDate       DateTime          @map("end_date") @db.Date
+  status        ReservationStatus @default(pending)
+  requestedAt   DateTime          @default(now()) @map("requested_at")
+  respondedAt   DateTime?         @map("responded_at")
+
+  community   Community @relation(fields: [communityId], references: [id])
+  toolListing Listing   @relation(fields: [toolListingId], references: [id])
+  requester   User      @relation(fields: [requesterId], references: [id])
+
+  @@map("reservations")
+}
+
+model VeredaFollow {
+  userId   String @map("user_id") @db.Uuid
+  veredaId String @map("vereda_id") @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id])
+  vereda Vereda @relation(fields: [veredaId], references: [id])
+
+  @@id([userId, veredaId])
+  @@map("vereda_follows")
+}
