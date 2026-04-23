@@ -9,28 +9,25 @@ data "aws_ecs_cluster" "main" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "santa-elena-ecs-tasks-${var.environment}"
-  description = "Permite tráfico desde el ALB hacia las tasks ECS"
+  description = "Allow traffic from ALB to ECS tasks"
   vpc_id      = var.vpc_id
 
-  # Tráfico entrante desde el ALB (Next.js en puerto 3000)
   ingress {
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
     security_groups = [var.alb_sg_id]
-    description     = "Next.js desde ALB"
+    description     = "Next.js from ALB"
   }
 
-  # PostgreSQL solo accesible internamente entre tasks
   ingress {
-    from_port = 5432
-    to_port   = 5432
-    protocol  = "tcp"
-    self      = true
-    description = "PostgreSQL entre tasks del mismo SG"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    self        = true
+    description = "PostgreSQL internal"
   }
 
-  # Todo el tráfico saliente (para ECR pull, S3, Secrets Manager)
   egress {
     from_port   = 0
     to_port     = 0

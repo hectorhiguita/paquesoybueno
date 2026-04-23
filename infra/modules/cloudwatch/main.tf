@@ -20,7 +20,7 @@ resource "aws_cloudwatch_metric_alarm" "app_cpu_high" {
   period              = 60
   statistic           = "Average"
   threshold           = 85
-  alarm_description   = "CPU de la app supera el 85%"
+  alarm_description   = "App CPU above 85%"
   treat_missing_data  = "notBreaching"
 }
 
@@ -34,6 +34,6 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   period              = 60
   statistic           = "Sum"
   threshold           = 10
-  alarm_description   = "Más de 10 errores 5xx en 1 minuto"
+  alarm_description   = "More than 10 5xx errors in 1 minute"
   treat_missing_data  = "notBreaching"
 }

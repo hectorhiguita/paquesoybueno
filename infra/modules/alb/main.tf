@@ -2,7 +2,7 @@
 
 resource "aws_security_group" "alb" {
   name        = "santa-elena-alb-${var.environment}"
-  description = "Permite HTTP/HTTPS desde internet"
+  description = "Allow HTTP/HTTPS from internet"
   vpc_id      = var.vpc_id
 
   ingress {
