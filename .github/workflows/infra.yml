@@ -19,6 +19,12 @@ on:
         type: choice
         options: [plan, apply, destroy]
 
+# Permisos necesarios para comentar en PRs y leer el repo
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 env:
   AWS_REGION:      us-east-1
   AWS_ACCOUNT_ID:  450328359598
@@ -92,19 +98,26 @@ jobs:
       - name: Comentar plan en PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('infra/plan_output.txt', 'utf8');
-            const truncated = plan.length > 60000
-              ? plan.substring(0, 60000) + '\n\n... (truncado)'
-              : plan;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## 📋 Terraform Plan\n\`\`\`hcl\n${truncated}\n\`\`\``
-            });
+            try {
+              const plan = fs.readFileSync('infra/plan_output.txt', 'utf8');
+              // Eliminar códigos ANSI de color
+              const clean = plan.replace(/\x1b\[[0-9;]*m/g, '');
+              const truncated = clean.length > 60000
+                ? clean.substring(0, 60000) + '\n\n... (truncado)'
+                : clean;
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 📋 Terraform Plan\n\`\`\`\n${truncated}\n\`\`\``
+              });
+            } catch (e) {
+              core.warning(`No se pudo comentar el plan: ${e.message}`);
+            }
 
       # Apply solo en push a main o workflow_dispatch con action=apply
       - name: Terraform Apply
