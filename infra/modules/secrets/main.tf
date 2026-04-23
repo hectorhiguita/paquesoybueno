@@ -1,7 +1,7 @@
 # Todas las variables de entorno sensibles en un único secret JSON
 resource "aws_secretsmanager_secret" "app" {
   name                    = "santa-elena/${var.environment}/app"
-  description             = "Variables de entorno de la aplicación Santa Elena Platform"
+  description = "App secrets for Santa Elena Platform"
   recovery_window_in_days = var.environment == "prod" ? 7 : 0
 
   tags = { Name = "santa-elena-app-secrets-${var.environment}" }

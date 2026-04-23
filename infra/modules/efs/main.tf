@@ -16,7 +16,7 @@ resource "aws_efs_file_system" "postgres" {
 # Security group para EFS
 resource "aws_security_group" "efs" {
   name        = "santa-elena-efs-sg-${var.environment}"
-  description = "Permite acceso NFS desde ECS tasks"
+  description = "Allow NFS access from ECS tasks"
   vpc_id      = var.vpc_id
 
   ingress {
