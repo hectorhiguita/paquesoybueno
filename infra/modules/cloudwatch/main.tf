@@ -4,12 +4,6 @@ resource "aws_cloudwatch_log_group" "app" {
   tags              = { Name = "santa-elena-app-logs-${var.environment}" }
 }
 
-resource "aws_cloudwatch_log_group" "postgres" {
-  name              = "/ecs/santa-elena-postgres-${var.environment}"
-  retention_in_days = 14
-  tags              = { Name = "santa-elena-postgres-logs-${var.environment}" }
-}
-
 # Alarma: CPU alta en la app
 resource "aws_cloudwatch_metric_alarm" "app_cpu_high" {
   alarm_name          = "santa-elena-app-cpu-high-${var.environment}"

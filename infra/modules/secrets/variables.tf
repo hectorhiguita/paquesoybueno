@@ -64,3 +64,9 @@ variable "assets_bucket_name" {
 variable "aws_region" {
   type = string
 }
+
+variable "database_url" {
+  type      = string
+  sensitive = true
+  default   = ""
+}

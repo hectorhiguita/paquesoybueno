@@ -8,9 +8,6 @@ terraform {
     }
   }
 
-  # Estado remoto en S3
-  # Bucket existente: practicas-itm-tfstate-450328359598
-  # Prefix dedicado para este proyecto: santa-elena-platform/
   backend "s3" {
     bucket  = "practicas-itm-tfstate-450328359598"
     key     = "santa-elena-platform/terraform.tfstate"
@@ -58,6 +55,16 @@ module "iam" {
   backups_bucket = module.s3.backups_bucket_arn
 }
 
+# RDS PostgreSQL db.t3.micro — reemplaza el contenedor de postgres
+module "rds" {
+  source             = "./modules/rds"
+  environment        = var.environment
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = module.vpc.vpc_cidr
+  private_subnet_ids = module.vpc.private_subnet_ids
+  postgres_password  = var.postgres_password
+}
+
 module "secrets" {
   source               = "./modules/secrets"
   environment          = var.environment
@@ -73,6 +80,8 @@ module "secrets" {
   postgres_password    = var.postgres_password
   assets_bucket_name   = module.s3.assets_bucket_name
   aws_region           = var.aws_region
+  # DATABASE_URL apunta a RDS
+  database_url         = module.rds.database_url
 }
 
 module "cloudwatch" {
@@ -80,9 +89,6 @@ module "cloudwatch" {
   environment = var.environment
 }
 
-# DNS + ACM — santaelenacomunidad.online
-# Hosted Zone: Z03033341JKQ5TU71XOGC
-# Se crea antes del ALB para que el certificado esté validado
 module "dns" {
   source         = "./modules/dns"
   environment    = var.environment
@@ -97,17 +103,7 @@ module "alb" {
   environment       = var.environment
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
-  # El certificado lo genera el módulo dns
   certificate_arn   = module.dns.certificate_arn
-}
-
-module "efs" {
-  source             = "./modules/efs"
-  environment        = var.environment
-  vpc_id             = module.vpc.vpc_id
-  vpc_cidr           = module.vpc.vpc_cidr
-  private_subnet_ids = module.vpc.private_subnet_ids
-  ecs_sg_id          = module.ecs.ecs_sg_id
 }
 
 module "ses" {
@@ -131,10 +127,7 @@ module "ecs" {
   ecs_task_role_arn    = module.iam.ecs_task_role_arn
   ecs_exec_role_arn    = module.iam.ecs_exec_role_arn
   secrets_arn          = module.secrets.secret_arn
-  efs_id               = module.efs.efs_id
-  efs_access_point_id  = module.efs.access_point_id
   log_group_app        = module.cloudwatch.log_group_app
-  log_group_postgres   = module.cloudwatch.log_group_postgres
   postgres_password    = var.postgres_password
   ecs_cluster_name     = "practicas-itm"
 }
