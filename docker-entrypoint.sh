@@ -2,7 +2,8 @@
 set -e
 
 echo "→ Ejecutando migraciones de Prisma..."
-npx prisma migrate deploy
+# En standalone, prisma CLI viene del node_modules copiado
+./node_modules/.bin/prisma migrate deploy
 
-echo "→ Iniciando aplicación Next.js..."
+echo "→ Iniciando aplicacion Next.js..."
 exec node server.js
