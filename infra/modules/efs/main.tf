@@ -58,7 +58,7 @@ resource "aws_efs_access_point" "postgres_data" {
     creation_info {
       owner_uid   = 999
       owner_gid   = 999
-      permissions = "755"
+      permissions = "0700"
     }
   }
 
