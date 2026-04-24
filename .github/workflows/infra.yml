@@ -13,13 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Acción de Terraform'
+        description: 'Accion de Terraform'
         required: true
         default: 'apply'
         type: choice
         options: [plan, apply, destroy]
 
-# Permisos necesarios para comentar en PRs y leer el repo
 permissions:
   contents: read
   pull-requests: write
@@ -32,11 +31,30 @@ env:
   TF_STATE_KEY:    santa-elena-platform/terraform.tfstate
   TF_VERSION:      1.7.0
 
+# Variables TF comunes — se reutilizan en todos los pasos
+defaults:
+  run:
+    working-directory: infra
+
 jobs:
   terraform:
     name: Terraform ${{ github.event.inputs.action || (github.event_name == 'pull_request' && 'plan') || 'apply' }}
     runs-on: ubuntu-latest
     environment: ${{ github.event_name != 'pull_request' && 'prod' || '' }}
+
+    env:
+      TF_VAR_aws_account_id:       ${{ vars.AWS_ACCOUNT_ID || '450328359598' }}
+      TF_VAR_aws_region:           us-east-1
+      TF_VAR_nextauth_secret:      ${{ secrets.NEXTAUTH_SECRET }}
+      TF_VAR_nextauth_url:         ${{ secrets.NEXTAUTH_URL }}
+      TF_VAR_google_client_id:     ${{ secrets.GOOGLE_CLIENT_ID || '' }}
+      TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
+      TF_VAR_twilio_account_sid:   ${{ secrets.TWILIO_ACCOUNT_SID }}
+      TF_VAR_twilio_auth_token:    ${{ secrets.TWILIO_AUTH_TOKEN }}
+      TF_VAR_twilio_phone_number:  ${{ secrets.TWILIO_PHONE_NUMBER }}
+      TF_VAR_vapid_public_key:     ${{ secrets.VAPID_PUBLIC_KEY || '' }}
+      TF_VAR_vapid_private_key:    ${{ secrets.VAPID_PRIVATE_KEY || '' }}
+      TF_VAR_postgres_password:    ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -54,47 +72,32 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        working-directory: infra
         run: |
           terraform init \
             -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
             -backend-config="key=${{ env.TF_STATE_KEY }}" \
             -backend-config="region=${{ env.AWS_REGION }}"
 
-      - name: Terraform Format Check
-        working-directory: infra
-        run: terraform fmt -check -recursive
-        continue-on-error: true
-
       - name: Terraform Validate
-        working-directory: infra
         run: terraform validate
 
-      - name: Terraform Plan
-        id: plan
-        working-directory: infra
-        env:
-          TF_VAR_aws_account_id:       ${{ env.AWS_ACCOUNT_ID }}
-          TF_VAR_aws_region:           ${{ env.AWS_REGION }}
-          TF_VAR_nextauth_secret:      ${{ secrets.NEXTAUTH_SECRET }}
-          TF_VAR_nextauth_url:         ${{ secrets.NEXTAUTH_URL }}
-          TF_VAR_google_client_id:     ${{ secrets.GOOGLE_CLIENT_ID || '' }}
-          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
-          TF_VAR_twilio_account_sid:   ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TF_VAR_twilio_auth_token:    ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TF_VAR_twilio_phone_number:  ${{ secrets.TWILIO_PHONE_NUMBER }}
-          TF_VAR_vapid_public_key:     ${{ secrets.VAPID_PUBLIC_KEY || '' }}
-          TF_VAR_vapid_private_key:    ${{ secrets.VAPID_PRIVATE_KEY || '' }}
-          TF_VAR_postgres_password:    ${{ secrets.POSTGRES_PASSWORD }}
+      # Limpia del estado recursos que ahora son data sources
+      # Debe ejecutarse ANTES del plan para que el estado sea consistente
+      - name: Limpiar estado obsoleto
+        if: github.event_name != 'pull_request'
+        run: |
+          terraform state rm module.alb.aws_security_group.alb 2>/dev/null || true
+          terraform state rm module.ecs.aws_security_group.ecs_tasks 2>/dev/null || true
+
+      # ── PR: solo plan ────────────────────────────────────────────────────────
+      - name: Terraform Plan (PR)
+        if: github.event_name == 'pull_request'
         run: |
           terraform plan \
             -var-file=environments/prod.tfvars \
-            -out=tfplan \
-            -detailed-exitcode 2>&1 | tee plan_output.txt
-          echo "exitcode=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+            -no-color 2>&1 | tee plan_output.txt
         continue-on-error: true
 
-      # En PRs, publica el plan como comentario
       - name: Comentar plan en PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -104,80 +107,33 @@ jobs:
             const fs = require('fs');
             try {
               const plan = fs.readFileSync('infra/plan_output.txt', 'utf8');
-              // Eliminar códigos ANSI de color
-              const clean = plan.replace(/\x1b\[[0-9;]*m/g, '');
-              const truncated = clean.length > 60000
-                ? clean.substring(0, 60000) + '\n\n... (truncado)'
-                : clean;
+              const truncated = plan.length > 60000
+                ? plan.substring(0, 60000) + '\n\n... (truncado)'
+                : plan;
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `## 📋 Terraform Plan\n\`\`\`\n${truncated}\n\`\`\``
+                body: `## Terraform Plan\n\`\`\`\n${truncated}\n\`\`\``
               });
             } catch (e) {
               core.warning(`No se pudo comentar el plan: ${e.message}`);
             }
 
-      # Apply solo en push a main o workflow_dispatch con action=apply
-      - name: Terraform Import SGs existentes
-        if: |
-          github.event_name != 'pull_request' &&
-          (github.event.inputs.action == 'apply' || github.event.inputs.action == null)
-        working-directory: infra
-        env:
-          TF_VAR_aws_account_id:       ${{ env.AWS_ACCOUNT_ID }}
-          TF_VAR_aws_region:           ${{ env.AWS_REGION }}
-          TF_VAR_nextauth_secret:      ${{ secrets.NEXTAUTH_SECRET }}
-          TF_VAR_nextauth_url:         ${{ secrets.NEXTAUTH_URL }}
-          TF_VAR_google_client_id:     ${{ secrets.GOOGLE_CLIENT_ID || '' }}
-          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
-          TF_VAR_twilio_account_sid:   ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TF_VAR_twilio_auth_token:    ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TF_VAR_twilio_phone_number:  ${{ secrets.TWILIO_PHONE_NUMBER }}
-          TF_VAR_vapid_public_key:     ${{ secrets.VAPID_PUBLIC_KEY || '' }}
-          TF_VAR_vapid_private_key:    ${{ secrets.VAPID_PRIVATE_KEY || '' }}
-          TF_VAR_postgres_password:    ${{ secrets.POSTGRES_PASSWORD }}
-        # Elimina del estado los recursos que ahora son data sources
-        # para que Terraform no intente destruirlos
-        run: |
-          terraform state rm module.alb.aws_security_group.alb 2>/dev/null || true
-
+      # ── Push a main / workflow_dispatch apply: plan + apply en un solo paso ──
       - name: Terraform Apply
         if: |
           github.event_name != 'pull_request' &&
           (github.event.inputs.action == 'apply' || github.event.inputs.action == null)
-        working-directory: infra
-        env:
-          TF_VAR_aws_account_id:       ${{ env.AWS_ACCOUNT_ID }}
-          TF_VAR_aws_region:           ${{ env.AWS_REGION }}
-          TF_VAR_nextauth_secret:      ${{ secrets.NEXTAUTH_SECRET }}
-          TF_VAR_nextauth_url:         ${{ secrets.NEXTAUTH_URL }}
-          TF_VAR_google_client_id:     ${{ secrets.GOOGLE_CLIENT_ID || '' }}
-          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
-          TF_VAR_twilio_account_sid:   ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TF_VAR_twilio_auth_token:    ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TF_VAR_twilio_phone_number:  ${{ secrets.TWILIO_PHONE_NUMBER }}
-          TF_VAR_vapid_public_key:     ${{ secrets.VAPID_PUBLIC_KEY || '' }}
-          TF_VAR_vapid_private_key:    ${{ secrets.VAPID_PRIVATE_KEY || '' }}
-          TF_VAR_postgres_password:    ${{ secrets.POSTGRES_PASSWORD }}
-        run: terraform apply -auto-approve tfplan
+        run: |
+          terraform apply \
+            -auto-approve \
+            -var-file=environments/prod.tfvars
 
-      # Destroy solo si se dispara manualmente con action=destroy
+      # ── Destroy manual ───────────────────────────────────────────────────────
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy'
-        working-directory: infra
-        env:
-          TF_VAR_aws_account_id:       ${{ env.AWS_ACCOUNT_ID }}
-          TF_VAR_aws_region:           ${{ env.AWS_REGION }}
-          TF_VAR_nextauth_secret:      ${{ secrets.NEXTAUTH_SECRET }}
-          TF_VAR_nextauth_url:         ${{ secrets.NEXTAUTH_URL }}
-          TF_VAR_google_client_id:     ${{ secrets.GOOGLE_CLIENT_ID || '' }}
-          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
-          TF_VAR_twilio_account_sid:   ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TF_VAR_twilio_auth_token:    ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TF_VAR_twilio_phone_number:  ${{ secrets.TWILIO_PHONE_NUMBER }}
-          TF_VAR_vapid_public_key:     ${{ secrets.VAPID_PUBLIC_KEY || '' }}
-          TF_VAR_vapid_private_key:    ${{ secrets.VAPID_PRIVATE_KEY || '' }}
-          TF_VAR_postgres_password:    ${{ secrets.POSTGRES_PASSWORD }}
-        run: terraform destroy -auto-approve -var-file=environments/prod.tfvars
+        run: |
+          terraform destroy \
+            -auto-approve \
+            -var-file=environments/prod.tfvars
