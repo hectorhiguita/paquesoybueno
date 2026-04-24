@@ -81,14 +81,10 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      # Limpia del estado recursos que ahora son data sources
-      # e importa recursos que ya existen en AWS
-      - name: Limpiar estado obsoleto e importar recursos existentes
+      # Importa recursos que ya existen en AWS pero no están en el estado
+      - name: Importar recursos existentes
         if: github.event_name != 'pull_request'
         run: |
-          terraform state rm module.alb.aws_security_group.alb 2>/dev/null || true
-          terraform state rm module.ecs.aws_security_group.ecs_tasks 2>/dev/null || true
-
           # Importar el SG de ECS tasks si ya existe en AWS pero no en el estado
           ECS_SG_ID=$(aws ec2 describe-security-groups \
             --filters "Name=group-name,Values=santa-elena-ecs-tasks-prod" \

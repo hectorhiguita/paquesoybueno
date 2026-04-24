@@ -13,3 +13,7 @@ output "public_subnet_ids" {
 output "private_subnet_ids" {
   value = var.private_subnet_ids
 }
+
+output "vpc_endpoints_sg_id" {
+  value = aws_security_group.vpc_endpoints.id
+}
