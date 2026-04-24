@@ -105,6 +105,7 @@ module "efs" {
   source             = "./modules/efs"
   environment        = var.environment
   vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = module.vpc.vpc_cidr
   private_subnet_ids = module.vpc.private_subnet_ids
   ecs_sg_id          = module.ecs.ecs_sg_id
 }

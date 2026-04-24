@@ -16,14 +16,16 @@ resource "aws_efs_file_system" "postgres" {
 # Security group para EFS
 resource "aws_security_group" "efs" {
   name        = "santa-elena-efs-sg-${var.environment}"
-  description = "Allow NFS access from ECS tasks"
+  description = "Allow NFS access from VPC"
   vpc_id      = var.vpc_id
 
+  # Permite NFS desde cualquier recurso dentro de la VPC
   ingress {
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
-    security_groups = [var.ecs_sg_id]
+    from_port   = 2049
+    to_port     = 2049
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "NFS from VPC"
   }
 
   egress {
@@ -33,7 +35,11 @@ resource "aws_security_group" "efs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "santa-elena-efs-sg-${var.environment}" }
+  tags  = { Name = "santa-elena-efs-sg-${var.environment}" }
+
+  lifecycle {
+    ignore_changes = [description]
+  }
 }
 
 # Mount targets en cada subnet privada
