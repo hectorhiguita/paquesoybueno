@@ -1,11 +1,10 @@
 /**
- * Email sending utility.
- * Uses SMTP via nodemailer when SMTP_HOST, SMTP_USER, SMTP_PASS env vars are
- * present; otherwise logs to console (dev/test mode).
+ * Email sending via AWS SES using the AWS SDK v3.
+ * Falls back to console log in dev/test when SES is not configured.
  *
- * Nodemailer is an optional peer dependency — install it with:
- *   npm install nodemailer
- *   npm install -D @types/nodemailer
+ * Required env vars for SES:
+ *   AWS_REGION        (already set by ECS task role)
+ *   SES_FROM_EMAIL    e.g. "noreply@santaelenacomunidad.online"
  */
 
 export interface EmailSendResult {
@@ -21,99 +20,70 @@ export interface EmailOptions {
   html?: string;
 }
 
-/**
- * Sends an email.
- */
 export async function sendEmail(options: EmailOptions): Promise<EmailSendResult> {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM ?? "Santa Elena Platform <noreply@santaelena.local>";
+  const fromEmail = process.env.SES_FROM_EMAIL;
+  const region    = process.env.AWS_REGION ?? "us-east-1";
 
-  if (host && user && pass) {
-    return sendViaSmtp({ ...options, from }, host, user, pass);
+  // Dev/test fallback — no SES configured
+  if (!fromEmail) {
+    console.log(`[EMAIL DEV] To: ${options.to} | Subject: ${options.subject}\n${options.text}`);
+    return { success: true };
   }
 
-  // Dev/test fallback — log to console
-  console.log(
-    `[EMAIL DEV] To: ${options.to} | Subject: ${options.subject}\n${options.text}`
-  );
-  return { success: true };
+  try {
+    const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
+
+    const client = new SESClient({ region });
+
+    const command = new SendEmailCommand({
+      Source: fromEmail,
+      Destination: { ToAddresses: [options.to] },
+      Message: {
+        Subject: { Data: options.subject, Charset: "UTF-8" },
+        Body: {
+          Text: { Data: options.text, Charset: "UTF-8" },
+          ...(options.html
+            ? { Html: { Data: options.html, Charset: "UTF-8" } }
+            : {}),
+        },
+      },
+    });
+
+    const result = await client.send(command);
+    return { success: true, messageId: result.MessageId };
+  } catch (err) {
+    console.error("[email] SES error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "SES send error",
+    };
+  }
 }
 
-/**
- * Sends an account-locked notification email.
- */
 export async function sendAccountLockedEmail(
   email: string,
   lockedUntil: Date
 ): Promise<EmailSendResult> {
-  const minutesLeft = Math.ceil(
-    (lockedUntil.getTime() - Date.now()) / 60_000
-  );
+  const minutesLeft = Math.ceil((lockedUntil.getTime() - Date.now()) / 60_000);
 
   return sendEmail({
     to: email,
-    subject: "Tu cuenta ha sido bloqueada temporalmente — Santa Elena Platform",
+    subject: "Tu cuenta ha sido bloqueada temporalmente - Santa Elena Platform",
     text: [
       "Hola,",
       "",
-      `Tu cuenta ha sido bloqueada temporalmente por ${minutesLeft} minutos debido a múltiples intentos de inicio de sesión fallidos.`,
+      `Tu cuenta ha sido bloqueada temporalmente por ${minutesLeft} minutos debido a multiples intentos de inicio de sesion fallidos.`,
       "",
-      "Si no fuiste tú, te recomendamos cambiar tu contraseña cuando puedas acceder nuevamente.",
+      "Si no fuiste tu, te recomendamos cambiar tu contrasena cuando puedas acceder nuevamente.",
       "",
-      "— Equipo Santa Elena Platform",
+      "-- Equipo Santa Elena Platform",
     ].join("\n"),
     html: `
       <p>Hola,</p>
-      <p>Tu cuenta ha sido <strong>bloqueada temporalmente por ${minutesLeft} minutos</strong> debido a múltiples intentos de inicio de sesión fallidos.</p>
-      <p>Si no fuiste tú, te recomendamos cambiar tu contraseña cuando puedas acceder nuevamente.</p>
-      <p>— Equipo Santa Elena Platform</p>
+      <p>Tu cuenta ha sido <strong>bloqueada temporalmente por ${minutesLeft} minutos</strong>
+         debido a multiples intentos de inicio de sesion fallidos.</p>
+      <p>Si no fuiste tu, te recomendamos cambiar tu contrasena cuando puedas acceder nuevamente.</p>
+      <p>-- Equipo Santa Elena Platform</p>
     `,
   });
-}
-
-// ---------------------------------------------------------------------------
-// SMTP transport (nodemailer)
-// ---------------------------------------------------------------------------
-
-async function sendViaSmtp(
-  options: EmailOptions & { from: string },
-  host: string,
-  user: string,
-  pass: string
-): Promise<EmailSendResult> {
-  try {
-    // Dynamic import so nodemailer is optional
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nodemailer = await import("nodemailer").catch(() => null);
-    if (!nodemailer) {
-      console.warn("[email] nodemailer not installed; falling back to console log");
-      console.log(`[EMAIL FALLBACK] To: ${options.to} | Subject: ${options.subject}`);
-      return { success: true };
-    }
-
-    const port = parseInt(process.env.SMTP_PORT ?? "587", 10);
-    const transporter = nodemailer.default.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-
-    const info = await transporter.sendMail({
-      from: options.from,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    });
-
-    return { success: true, messageId: info.messageId };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Error desconocido al enviar email",
-    };
-  }
 }
