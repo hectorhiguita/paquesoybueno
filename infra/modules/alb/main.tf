@@ -1,32 +1,8 @@
-# ─── Security Group del ALB ───────────────────────────────────────────────────
+# ─── Security Group del ALB — existente, solo referencia ─────────────────────
+# sg-07b77e3f781d7be6a
 
-resource "aws_security_group" "alb" {
-  name        = "santa-elena-alb-${var.environment}"
-  description = "Allow HTTP/HTTPS from internet"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "santa-elena-alb-sg-${var.environment}" }
+data "aws_security_group" "alb" {
+  id = var.alb_sg_id
 }
 
 # ─── Application Load Balancer ────────────────────────────────────────────────
@@ -35,7 +11,7 @@ resource "aws_lb" "main" {
   name               = "santa-elena-alb-${var.environment}"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
+  security_groups    = [data.aws_security_group.alb.id]
   subnets            = var.public_subnet_ids
 
   enable_deletion_protection = var.environment == "prod"

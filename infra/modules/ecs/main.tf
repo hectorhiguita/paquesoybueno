@@ -36,6 +36,13 @@ resource "aws_security_group" "ecs_tasks" {
   }
 
   tags = { Name = "santa-elena-ecs-tasks-${var.environment}" }
+
+  lifecycle {
+    # Evita destruir el SG si tiene ENIs asociadas
+    prevent_destroy = true
+    # Ignora cambios en description (inmutable en AWS sin recrear)
+    ignore_changes = [description]
+  }
 }
 
 # ─── Task Definition — PostgreSQL ─────────────────────────────────────────────

@@ -120,6 +120,29 @@ jobs:
             }
 
       # Apply solo en push a main o workflow_dispatch con action=apply
+      - name: Terraform Import SGs existentes
+        if: |
+          github.event_name != 'pull_request' &&
+          (github.event.inputs.action == 'apply' || github.event.inputs.action == null)
+        working-directory: infra
+        env:
+          TF_VAR_aws_account_id:       ${{ env.AWS_ACCOUNT_ID }}
+          TF_VAR_aws_region:           ${{ env.AWS_REGION }}
+          TF_VAR_nextauth_secret:      ${{ secrets.NEXTAUTH_SECRET }}
+          TF_VAR_nextauth_url:         ${{ secrets.NEXTAUTH_URL }}
+          TF_VAR_google_client_id:     ${{ secrets.GOOGLE_CLIENT_ID || '' }}
+          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
+          TF_VAR_twilio_account_sid:   ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TF_VAR_twilio_auth_token:    ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TF_VAR_twilio_phone_number:  ${{ secrets.TWILIO_PHONE_NUMBER }}
+          TF_VAR_vapid_public_key:     ${{ secrets.VAPID_PUBLIC_KEY || '' }}
+          TF_VAR_vapid_private_key:    ${{ secrets.VAPID_PRIVATE_KEY || '' }}
+          TF_VAR_postgres_password:    ${{ secrets.POSTGRES_PASSWORD }}
+        # Elimina del estado los recursos que ahora son data sources
+        # para que Terraform no intente destruirlos
+        run: |
+          terraform state rm module.alb.aws_security_group.alb 2>/dev/null || true
+
       - name: Terraform Apply
         if: |
           github.event_name != 'pull_request' &&
