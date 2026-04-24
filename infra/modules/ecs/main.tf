@@ -191,7 +191,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "VAPID_PUBLIC_KEY",     valueFrom = "${var.secrets_arn}:VAPID_PUBLIC_KEY::" },
         { name = "VAPID_PRIVATE_KEY",    valueFrom = "${var.secrets_arn}:VAPID_PRIVATE_KEY::" },
         { name = "AWS_S3_BUCKET",        valueFrom = "${var.secrets_arn}:AWS_S3_BUCKET::" },
-        { name = "AWS_REGION",           valueFrom = "${var.secrets_arn}:AWS_REGION::" }
+        { name = "AWS_REGION",           valueFrom = "${var.secrets_arn}:AWS_REGION::" },
+        { name = "SES_FROM_EMAIL",       valueFrom = "${var.secrets_arn}:SES_FROM_EMAIL::" }
       ]
 
       logConfiguration = {

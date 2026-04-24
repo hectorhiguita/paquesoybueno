@@ -109,6 +109,14 @@ module "efs" {
   ecs_sg_id          = module.ecs.ecs_sg_id
 }
 
+module "ses" {
+  source             = "./modules/ses"
+  environment        = var.environment
+  domain_name        = "santaelenacomunidad.online"
+  hosted_zone_id     = "Z03033341JKQ5TU71XOGC"
+  ecs_task_role_name = module.iam.ecs_task_role_name
+}
+
 module "ecs" {
   source               = "./modules/ecs"
   environment          = var.environment

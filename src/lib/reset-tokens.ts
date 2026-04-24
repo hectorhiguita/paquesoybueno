@@ -60,7 +60,7 @@ export function validateResetToken(
  * email + community pair.
  */
 export function hasValidResetToken(email: string, communityId: string): boolean {
-  for (const [, entry] of store) {
+  for (const entry of store.values()) {
     if (entry.email === email && entry.communityId === communityId) {
       if (Date.now() <= entry.expiresAt) return true;
     }

@@ -26,5 +26,6 @@ resource "aws_secretsmanager_secret_version" "app" {
     # S3 — la app usa el IAM role, no credenciales explícitas
     AWS_S3_BUCKET        = var.assets_bucket_name
     AWS_REGION           = var.aws_region
+    SES_FROM_EMAIL       = "noreply@santaelenacomunidad.online"
   })
 }
