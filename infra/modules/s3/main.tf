@@ -71,6 +71,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "assets" {
     id     = "archive-old-images"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 90
       storage_class = "GLACIER_IR"
@@ -121,6 +123,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
   rule {
     id     = "expire-old-backups"
     status = "Enabled"
+
+    filter {}
 
     expiration { days = 30 }
 
