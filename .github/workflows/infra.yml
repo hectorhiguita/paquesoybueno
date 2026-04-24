@@ -82,12 +82,26 @@ jobs:
         run: terraform validate
 
       # Limpia del estado recursos que ahora son data sources
-      # Debe ejecutarse ANTES del plan para que el estado sea consistente
-      - name: Limpiar estado obsoleto
+      # e importa recursos que ya existen en AWS
+      - name: Limpiar estado obsoleto e importar recursos existentes
         if: github.event_name != 'pull_request'
         run: |
           terraform state rm module.alb.aws_security_group.alb 2>/dev/null || true
           terraform state rm module.ecs.aws_security_group.ecs_tasks 2>/dev/null || true
+
+          # Importar el SG de ECS tasks si ya existe en AWS pero no en el estado
+          ECS_SG_ID=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=santa-elena-ecs-tasks-prod" \
+                      "Name=vpc-id,Values=vpc-05b9e9c5f8cccd4bd" \
+            --query "SecurityGroups[0].GroupId" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$ECS_SG_ID" ] && [ "$ECS_SG_ID" != "None" ]; then
+            echo "Importando SG de ECS tasks: $ECS_SG_ID"
+            terraform import \
+              -var-file=environments/prod.tfvars \
+              module.ecs.aws_security_group.ecs_tasks "$ECS_SG_ID" 2>/dev/null || true
+          fi
 
       # ── PR: solo plan ────────────────────────────────────────────────────────
       - name: Terraform Plan (PR)
