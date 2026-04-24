@@ -54,16 +54,10 @@ resource "aws_db_instance" "main" {
   multi_az            = false
   publicly_accessible = false
 
-  # Backups automáticos — 7 días de retención
-  backup_retention_period = 7
-  backup_window           = "03:00-04:00"
-  maintenance_window      = "Mon:04:00-Mon:05:00"
-
-  # No eliminar en destroy accidental en prod
-  deletion_protection = var.environment == "prod"
-  skip_final_snapshot = var.environment != "prod"
-
-  final_snapshot_identifier = var.environment == "prod" ? "santa-elena-prod-final" : null
+  # Free tier: backup_retention_period debe ser 0
+  backup_retention_period = 0
+  skip_final_snapshot     = true
+  deletion_protection     = false
 
   tags = { Name = "santa-elena-rds-${var.environment}" }
 }
