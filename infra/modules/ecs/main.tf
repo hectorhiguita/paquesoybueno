@@ -86,6 +86,10 @@ resource "aws_ecs_task_definition" "postgres" {
         { name = "PGDATA",        value = "/var/lib/postgresql/data" }
       ]
 
+      # Arrancar directamente como usuario postgres (UID 999)
+      # Evita el chown inicial que falla con EFS access points
+      user = "999:999"
+
       secrets = [
         {
           name      = "POSTGRES_PASSWORD"
