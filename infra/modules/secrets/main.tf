@@ -22,7 +22,7 @@ resource "aws_secretsmanager_secret_version" "app" {
     VAPID_PRIVATE_KEY    = var.vapid_private_key
     POSTGRES_PASSWORD    = var.postgres_password
     # DATABASE_URL se construye en la task definition usando el password del secret
-    DATABASE_URL = "postgresql://postgres:${var.postgres_password}@postgres.santa-elena.local:5432/santa_elena?schema=public"
+    DATABASE_URL         = var.database_url
     # S3 — la app usa el IAM role, no credenciales explícitas
     AWS_S3_BUCKET        = var.assets_bucket_name
     AWS_REGION           = var.aws_region
