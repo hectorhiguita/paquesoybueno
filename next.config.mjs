@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Necesario para el modo standalone en Docker/ECS
   output: "standalone",
   images: {
     remotePatterns: [
@@ -14,6 +13,14 @@ const nextConfig = {
         hostname: "*.amazonaws.com",
       },
     ],
+  },
+  // Módulos opcionales que no deben incluirse en el bundle del servidor
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // nodemailer es opcional — solo se usa si SMTP_HOST está configurado
+      config.externals = [...(config.externals || []), "nodemailer"];
+    }
+    return config;
   },
 };
 
