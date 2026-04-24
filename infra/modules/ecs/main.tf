@@ -83,7 +83,7 @@ resource "aws_ecs_task_definition" "postgres" {
       environment = [
         { name = "POSTGRES_DB",   value = "santa_elena" },
         { name = "POSTGRES_USER", value = "postgres" },
-        { name = "PGDATA",        value = "/var/lib/postgresql/data/pgdata" }
+        { name = "PGDATA",        value = "/var/lib/postgresql/data" }
       ]
 
       secrets = [
