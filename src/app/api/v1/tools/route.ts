@@ -31,6 +31,25 @@ const createToolSchema = z.object({
   pricePerDayCop: z.number().positive("El precio por día debe ser positivo").optional(),
 });
 
+function buildToolTradeDescription(input: {
+  condition: string;
+  pricePerHourCop?: number;
+  pricePerDayCop?: number;
+}) {
+  const hasRentalPricing =
+    input.pricePerHourCop !== undefined || input.pricePerDayCop !== undefined;
+
+  if (!hasRentalPricing) {
+    return input.condition;
+  }
+
+  return serializeToolMeta({
+    condition: input.condition,
+    pricePerHourCop: input.pricePerHourCop ?? null,
+    pricePerDayCop: input.pricePerDayCop ?? null,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/v1/tools
 // List tool listings with availability info
@@ -171,10 +190,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         type: "tool",
         status: "active",
         // Store condition in tradeDescription field (Req 8.1)
-        tradeDescription: serializeToolMeta({
+        tradeDescription: buildToolTradeDescription({
           condition: data.condition,
-          pricePerHourCop: data.pricePerHourCop ?? null,
-          pricePerDayCop: data.pricePerDayCop ?? null,
+          pricePerHourCop: data.pricePerHourCop,
+          pricePerDayCop: data.pricePerDayCop,
         }),
       },
       include: {

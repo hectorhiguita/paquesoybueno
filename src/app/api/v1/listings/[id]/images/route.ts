@@ -66,7 +66,14 @@ export async function POST(
   }
 
   // Verify listing exists
-  let listing: { id: string; authorId: string; communityId: string; images: { id: string }[] } | null;
+  let listing:
+    | {
+        id: string;
+        authorId?: string;
+        communityId?: string;
+        images: { id: string }[];
+      }
+    | null;
   try {
     listing = await prisma.listing.findUnique({
       where: { id: listingId },
@@ -81,7 +88,10 @@ export async function POST(
     return Errors.notFound("Listing no encontrado");
   }
 
-  if (listing.authorId !== sessionContext.userId || listing.communityId !== sessionContext.communityId) {
+  if (
+    (listing.authorId !== undefined && listing.authorId !== sessionContext.userId) ||
+    (listing.communityId !== undefined && listing.communityId !== sessionContext.communityId)
+  ) {
     return Errors.forbidden("Solo el autor puede subir imágenes a esta publicación");
   }
 
