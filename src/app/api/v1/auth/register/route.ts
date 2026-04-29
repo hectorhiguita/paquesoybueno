@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { generateActivationToken } from "@/lib/activation-tokens";
 import { sendActivationEmail } from "@/lib/email";
+import { colombianPhoneSchema } from "@/lib/validations/auth";
 
 const registerSchema = z.object({
   name:        z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   email:       z.string().email("Correo electrónico inválido"),
-  phone:       z.string().regex(/^3\d{9}$/, "Teléfono colombiano inválido (10 dígitos, empieza con 3)"),
+  phone:       colombianPhoneSchema,
   communityId: z.string().uuid("ID de comunidad inválido"),
   veredaId:    z.string().uuid("Vereda inválida").optional(),
+  // Compatibilidad temporal con el flujo anterior de registro directo.
+  password:    z.string().min(8, "La contraseña debe tener al menos 8 caracteres").optional(),
 });
 
 /**
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     userId = user.id;
   } catch (err) {
     // Req 1.4: error genérico — no revelar qué campo está duplicado
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    if ((err as { code?: string } | null)?.code === "P2002") {
       return NextResponse.json(
         { error: { code: "CONFLICT", message: "Ya existe una cuenta con estos datos", requestId: randomUUID() } },
         { status: 409 }

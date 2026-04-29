@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({
     message: {
       findMany: vi.fn(),
       create: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -59,6 +60,7 @@ describe("GET /api/v1/messages/:threadId", () => {
     vi.clearAllMocks();
     vi.mocked(prisma.messageThread.findFirst).mockResolvedValue(MOCK_THREAD as never);
     vi.mocked(prisma.message.findMany).mockResolvedValue([MOCK_MESSAGE] as never);
+    vi.mocked(prisma.message.updateMany).mockResolvedValue({ count: 1 } as never);
   });
 
   function makeRequest(threadId: string, headers: Record<string, string> = {}): NextRequest {
