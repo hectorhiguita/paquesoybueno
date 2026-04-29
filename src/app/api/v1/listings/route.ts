@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { requireSessionContext } from "@/lib/auth/session";
 import { createListingSchema, listingFiltersSchema } from "@/lib/validations/listing";
+import { serializeToolMeta } from "@/lib/tool-meta";
 
 // Patterns for auto-flagging (Req 9.4)
 const URL_PATTERN = /https?:\/\/|www\./i;
@@ -240,7 +241,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         type: data.type,
         status,
         priceCop: data.priceCop ?? null,
-        tradeDescription: data.tradeDescription ?? null,
+        tradeDescription:
+          data.type === "tool"
+            ? serializeToolMeta({
+                condition: data.tradeDescription ?? null,
+                pricePerHourCop: data.pricePerHourCop ?? null,
+                pricePerDayCop: data.pricePerDayCop ?? null,
+              })
+            : data.tradeDescription ?? null,
       },
       include: {
         author: { select: { id: true, name: true, isVerifiedProvider: true } },

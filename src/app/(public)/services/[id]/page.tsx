@@ -12,6 +12,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
       author: { select: { id: true, name: true, phone: true, isVerifiedProvider: true, createdAt: true } },
       category: { select: { id: true, name: true, icon: true } },
       vereda: { select: { name: true } },
+      images: { select: { id: true, url: true, order: true }, orderBy: { order: "asc" } },
       ratings: {
         include: { rater: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
@@ -66,6 +67,27 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
         {/* Perfil */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          {listing.images[0]?.url && (
+            <div className="mb-5">
+              <img
+                src={listing.images[0].url}
+                alt={listing.title}
+                className="h-64 w-full object-cover rounded-2xl"
+              />
+              {listing.images.length > 1 && (
+                <div className="grid grid-cols-4 gap-2 mt-3">
+                  {listing.images.slice(1, 5).map((image) => (
+                    <img
+                      key={image.id}
+                      src={image.url}
+                      alt={listing.title}
+                      className="h-20 w-full object-cover rounded-xl border border-gray-200"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-start gap-5">
             <div className="w-20 h-20 rounded-2xl bg-green-100 flex items-center justify-center text-3xl font-bold text-green-700 flex-shrink-0">
               {listing.author.name[0].toUpperCase()}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { NewListingForm } from "./NewListingForm";
+import { buildVeredaLabel } from "@/lib/vereda-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function NewListingPage({
         value: c.id,
         label: `${c.icon ?? "🔧"} ${c.name}`,
       }))}
-      veredas={veredas.map((v) => ({ value: v.id, label: v.name }))}
+      veredas={veredas.map((v) => ({ value: v.id, label: buildVeredaLabel(v.name) }))}
     />
   );
 }

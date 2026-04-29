@@ -17,6 +17,7 @@ export default async function MarketItemPage({ params }: { params: { id: string 
       author: { select: { id: true, name: true, phone: true, isVerifiedProvider: true } },
       vereda: { select: { name: true } },
       category: { select: { name: true } },
+      images: { select: { id: true, url: true, order: true }, orderBy: { order: "asc" } },
       ratings: { select: { stars: true } },
     },
   });
@@ -66,10 +67,26 @@ export default async function MarketItemPage({ params }: { params: { id: string 
 
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-56 flex items-center justify-center text-7xl">
-            {item.type === "sale" ? "🛒" : "🔄"}
-          </div>
+          {item.images[0]?.url ? (
+            <img src={item.images[0].url} alt={item.title} className="h-56 w-full object-cover" />
+          ) : (
+            <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-56 flex items-center justify-center text-7xl">
+              {item.type === "sale" ? "🛒" : "🔄"}
+            </div>
+          )}
           <div className="p-6">
+            {item.images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2 mb-5">
+                {item.images.slice(1, 5).map((image) => (
+                  <img
+                    key={image.id}
+                    src={image.url}
+                    alt={item.title}
+                    className="h-20 w-full object-cover rounded-xl border border-gray-200"
+                  />
+                ))}
+              </div>
+            )}
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">{item.title}</h1>

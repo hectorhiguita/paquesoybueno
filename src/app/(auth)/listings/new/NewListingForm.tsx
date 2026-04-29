@@ -12,7 +12,7 @@ const LISTING_TYPES = [
   { value: "service", label: "🛠️ Servicio" },
   { value: "sale", label: "🛒 Venta" },
   { value: "trade", label: "🔄 Trueque" },
-  { value: "tool", label: "🔨 Herramienta para préstamo" },
+  { value: "tool", label: "🔨 Alquiler de herramienta" },
 ];
 
 type FormState = {
@@ -22,6 +22,8 @@ type FormState = {
   categoryId: string;
   veredaId: string;
   priceCop: string;
+  pricePerHourCop: string;
+  pricePerDayCop: string;
   tradeDescription: string;
 };
 
@@ -39,6 +41,7 @@ export function NewListingForm({
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [images, setImages] = useState<File[]>([]);
   const [form, setForm] = useState<FormState>({
     type: initialType,
     title: "",
@@ -46,6 +49,8 @@ export function NewListingForm({
     categoryId: "",
     veredaId: "",
     priceCop: "",
+    pricePerHourCop: "",
+    pricePerDayCop: "",
     tradeDescription: "",
   });
 
@@ -58,7 +63,12 @@ export function NewListingForm({
     const next = new URLSearchParams(searchParams.toString());
     next.set("type", type);
     router.replace(`/listings/new?${next.toString()}`);
-    setForm((f) => ({ ...f, type }));
+    setForm((f) => ({ ...f, type, pricePerHourCop: "", pricePerDayCop: "" }));
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = Array.from(e.target.files ?? []).slice(0, 5);
+    setImages(next);
   };
 
   const handleSubmit = async () => {
@@ -72,6 +82,8 @@ export function NewListingForm({
       categoryId: form.categoryId,
       veredaId: form.veredaId,
       ...(form.priceCop ? { priceCop: Number(form.priceCop) } : {}),
+      ...(form.pricePerHourCop ? { pricePerHourCop: Number(form.pricePerHourCop) } : {}),
+      ...(form.pricePerDayCop ? { pricePerDayCop: Number(form.pricePerDayCop) } : {}),
       ...(form.tradeDescription ? { tradeDescription: form.tradeDescription } : {}),
     };
 
@@ -86,6 +98,26 @@ export function NewListingForm({
       if (!res.ok) {
         setError(data.error?.message ?? "No fue posible crear la publicación.");
         return;
+      }
+
+      const listingId = data.data?.listing?.id as string | undefined;
+      if (listingId && images.length > 0) {
+        const imageFormData = new FormData();
+        images.forEach((image) => imageFormData.append("images", image));
+
+        const imageRes = await fetch(`/api/v1/listings/${listingId}/images`, {
+          method: "POST",
+          body: imageFormData,
+        });
+
+        if (!imageRes.ok) {
+          const imageData = await imageRes.json().catch(() => null);
+          setError(
+            imageData?.error?.message ??
+              "La publicación se creó, pero no fue posible subir las fotos."
+          );
+          return;
+        }
       }
 
       setSubmitted(true);
@@ -117,8 +149,11 @@ export function NewListingForm({
                   categoryId: "",
                   veredaId: "",
                   priceCop: "",
+                  pricePerHourCop: "",
+                  pricePerDayCop: "",
                   tradeDescription: "",
                 });
+                setImages([]);
               }}
               className="flex-1 bg-green-700 text-white font-semibold text-sm py-2.5 rounded-xl hover:bg-green-800 transition-colors min-h-[44px]"
             >
@@ -172,12 +207,36 @@ export function NewListingForm({
               placeholder="Describe tu servicio, artículo o herramienta con detalle..."
               value={form.description}
               onChange={set("description")}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 resize-none"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-700 resize-none"
             />
           </div>
 
           <Select label="Categoría" options={[{ value: "", label: "Selecciona una categoría…" }, ...categories]} value={form.categoryId} onChange={set("categoryId")} />
           <Select label="Vereda" options={[{ value: "", label: "Selecciona tu vereda…" }, ...veredas]} value={form.veredaId} onChange={set("veredaId")} />
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Fotos de la publicación</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              multiple
+              onChange={handleImageChange}
+              className="block w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 file:mr-3 file:border-0 file:bg-green-50 file:text-green-700 file:font-medium file:px-3 file:py-2 file:rounded-lg"
+            />
+            <p className="text-xs text-gray-500 mt-1">Hasta 5 fotos JPG o PNG de máximo 5 MB cada una.</p>
+            {images.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {images.map((image, index) => (
+                  <div key={`${image.name}-${index}`} className="rounded-xl border border-gray-200 bg-gray-50 p-2">
+                    <p className="text-xs font-medium text-gray-700 truncate">{image.name}</p>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      {(image.size / 1024 / 1024).toFixed(1)} MB
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {form.type === "sale" && (
             <Input label="Precio (COP)" type="number" placeholder="Ej: 150000" value={form.priceCop} onChange={set("priceCop")} />
@@ -188,7 +247,25 @@ export function NewListingForm({
           )}
 
           {form.type === "tool" && (
-            <Input label="Condición de la herramienta" placeholder="Ej: Bueno, Regular, Necesita reparación" value={form.tradeDescription} onChange={set("tradeDescription")} />
+            <div className="space-y-4">
+              <Input label="Condición de la herramienta" placeholder="Ej: Bueno, Regular, Necesita reparación" value={form.tradeDescription} onChange={set("tradeDescription")} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Precio por hora (COP)"
+                  type="number"
+                  placeholder="Ej: 12000"
+                  value={form.pricePerHourCop}
+                  onChange={set("pricePerHourCop")}
+                />
+                <Input
+                  label="Precio por día (COP)"
+                  type="number"
+                  placeholder="Ej: 60000"
+                  value={form.pricePerDayCop}
+                  onChange={set("pricePerDayCop")}
+                />
+              </div>
+            </div>
           )}
 
           {error && (

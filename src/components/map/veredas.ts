@@ -1,22 +1,18 @@
+import { VEREDA_METADATA } from "@/lib/vereda-metadata";
+
 export interface Vereda {
   id: string;
   name: string;
   /** Approximate centroid coordinates */
   lat: number;
   lng: number;
+  sectors: string[];
+  territory?: "medellin" | "neighbor";
+  municipality?: string;
 }
 
-/** Representative veredas of the Santa Elena corregimiento, Medellín */
-export const VEREDAS: Vereda[] = [
-  { id: "barro-blanco", name: "Barro Blanco", lat: 6.2285, lng: -75.5012 },
-  { id: "el-placer", name: "El Placer", lat: 6.2201, lng: -75.4978 },
-  { id: "el-llano", name: "El Llano", lat: 6.2150, lng: -75.5100 },
-  { id: "piedras-blancas", name: "Piedras Blancas", lat: 6.2350, lng: -75.4900 },
-  { id: "media-luna", name: "Media Luna", lat: 6.2420, lng: -75.5050 },
-  { id: "el-cerro", name: "El Cerro", lat: 6.2480, lng: -75.4850 },
-  { id: "santa-elena-centro", name: "Santa Elena Centro", lat: 6.2300, lng: -75.4950 },
-  { id: "pantanillo", name: "Pantanillo", lat: 6.2100, lng: -75.5200 },
-];
+/** Veredas del territorio cultural de Santa Elena y veredas vecinas asociadas */
+export const VEREDAS: Vereda[] = VEREDA_METADATA;
 
 /** Haversine distance in km between two lat/lng points */
 export function haversineKm(

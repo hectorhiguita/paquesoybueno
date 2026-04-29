@@ -114,13 +114,13 @@ export function AdminCategoriesPanel() {
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           placeholder="Nombre"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[44px]"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 min-h-[44px]"
         />
         <input
           value={form.icon}
           onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
           placeholder="Icono (opcional)"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[44px]"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 min-h-[44px]"
         />
         <button
           type="submit"
@@ -133,7 +133,7 @@ export function AdminCategoriesPanel() {
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           placeholder="Descripción opcional"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[88px] sm:col-span-3"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 min-h-[88px] sm:col-span-3"
         />
       </form>
 

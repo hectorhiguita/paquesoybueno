@@ -37,7 +37,10 @@ export function VeredaSelector({
 
   const options = VEREDAS.map((v) => ({
     value: v.id,
-    label: v.id === suggested ? `${v.name} (sugerida por GPS)` : v.name,
+    label:
+      v.id === suggested
+        ? `${v.name} (sugerida por GPS)${v.sectors.length ? ` · ${v.sectors.join(", ")}` : ""}`
+        : `${v.name}${v.sectors.length ? ` · ${v.sectors.join(", ")}` : ""}`,
   }));
 
   return (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { z } from "zod";
+import { parseToolMeta, serializeToolMeta } from "@/lib/tool-meta";
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -26,6 +27,8 @@ const createToolSchema = z.object({
   veredaId: z.string().uuid("Vereda inválida"),
   categoryId: z.string().uuid("Categoría inválida"),
   communityId: z.string().uuid("ID de comunidad inválido"),
+  pricePerHourCop: z.number().positive("El precio por hora debe ser positivo").optional(),
+  pricePerDayCop: z.number().positive("El precio por día debe ser positivo").optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -49,6 +52,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
         vereda: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
+        images: { select: { id: true, url: true, order: true }, orderBy: { order: "asc" } },
         reservations: {
           where: { status: { in: ["pending", "confirmed"] } },
           select: { startDate: true, endDate: true, status: true },
@@ -58,24 +62,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     // Expose condition from tradeDescription and availability calendar
-    const toolsWithAvailability = tools.map((tool) => ({
-      id: tool.id,
-      title: tool.title,
-      description: tool.description,
-      condition: tool.tradeDescription ?? null,
-      vereda: tool.vereda,
-      category: tool.category,
-      author: tool.author,
-      status: tool.status,
-      isFeatured: tool.isFeatured,
-      createdAt: tool.createdAt,
+    const toolsWithAvailability = tools.map((tool) => {
+      const meta = parseToolMeta(tool.tradeDescription);
+      return {
+        id: tool.id,
+        title: tool.title,
+        description: tool.description,
+        condition: meta.condition,
+        vereda: tool.vereda,
+        category: tool.category,
+        author: tool.author,
+        images: tool.images,
+        status: tool.status,
+        isFeatured: tool.isFeatured,
+        createdAt: tool.createdAt,
+        pricePerHourCop: meta.pricePerHourCop,
+        pricePerDayCop: meta.pricePerDayCop,
       // Calendar: list of blocked date ranges (pending + confirmed)
-      blockedDates: tool.reservations.map((r) => ({
-        startDate: r.startDate,
-        endDate: r.endDate,
-        status: r.status,
-      })),
-    }));
+        blockedDates: tool.reservations.map((r) => ({
+          startDate: r.startDate,
+          endDate: r.endDate,
+          status: r.status,
+        })),
+      };
+    });
 
     return NextResponse.json({ data: { tools: toolsWithAvailability } }, { status: 200 });
   } catch (err) {
@@ -161,7 +171,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         type: "tool",
         status: "active",
         // Store condition in tradeDescription field (Req 8.1)
-        tradeDescription: data.condition,
+        tradeDescription: serializeToolMeta({
+          condition: data.condition,
+          pricePerHourCop: data.pricePerHourCop ?? null,
+          pricePerDayCop: data.pricePerDayCop ?? null,
+        }),
       },
       include: {
         author: { select: { id: true, name: true, isVerifiedProvider: true } },
@@ -175,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: {
           tool: {
             ...tool,
-            condition: tool.tradeDescription,
+            ...parseToolMeta(tool.tradeDescription),
           },
         },
       },

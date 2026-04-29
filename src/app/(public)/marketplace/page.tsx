@@ -41,6 +41,7 @@ export default async function MarketplacePage({
           include: {
             author: { select: { name: true, isVerifiedProvider: true } },
             vereda: { select: { name: true } },
+            images: { select: { url: true, order: true }, orderBy: { order: "asc" } },
           },
           orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
           take: 30,
@@ -120,9 +121,17 @@ export default async function MarketplacePage({
                     href={`/marketplace/${item.id}`}
                     className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md hover:border-green-300 transition-all block"
                   >
-                    <div className="bg-gray-100 h-36 flex items-center justify-center text-5xl font-bold text-gray-300">
-                      {activeTypeDef.icon}
-                    </div>
+                    {item.images[0]?.url ? (
+                      <img
+                        src={item.images[0].url}
+                        alt={item.title}
+                        className="h-36 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="bg-gray-100 h-36 flex items-center justify-center text-5xl font-bold text-gray-300">
+                        {activeTypeDef.icon}
+                      </div>
+                    )}
                     <div className="p-4">
                       <h3 className="font-semibold text-gray-800 text-sm leading-snug">
                         {item.title}

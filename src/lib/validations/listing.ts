@@ -18,6 +18,8 @@ export const createListingSchema = z.object({
   communityId: z.string().uuid("ID de comunidad inválido"),
   // Optional: price in COP for sale/rent (Req 3.2)
   priceCop: z.number().positive("El precio debe ser positivo").optional(),
+  pricePerHourCop: z.number().positive("El precio por hora debe ser positivo").optional(),
+  pricePerDayCop: z.number().positive("El precio por día debe ser positivo").optional(),
   // Optional: desired exchange description for trade (Req 3.3)
   tradeDescription: z.string().max(500, "La descripción de trueque no puede superar 500 caracteres").optional(),
 });

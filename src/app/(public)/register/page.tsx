@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { RegisterForm } from "./RegisterForm";
+import { buildVeredaLabel } from "@/lib/vereda-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -11,5 +12,9 @@ export default async function RegisterPage() {
     select: { id: true, name: true },
   });
 
-  return <RegisterForm veredas={veredas.map((v) => ({ value: v.id, label: v.name }))} />;
+  return (
+    <RegisterForm
+      veredas={veredas.map((v) => ({ value: v.id, label: buildVeredaLabel(v.name) }))}
+    />
+  );
 }

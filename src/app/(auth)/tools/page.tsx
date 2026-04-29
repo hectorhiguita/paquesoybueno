@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/config";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
+import { parseToolMeta } from "@/lib/tool-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function ToolsPage() {
     include: {
       author: { select: { id: true, name: true, isVerifiedProvider: true } },
       vereda: { select: { name: true } },
+      images: { select: { url: true, order: true }, orderBy: { order: "asc" } },
       reservations: {
         where: { status: "confirmed" },
         select: { startDate: true, endDate: true },
@@ -34,6 +36,7 @@ export default async function ToolsPage() {
   today.setHours(0, 0, 0, 0);
 
   const toolsWithAvail = tools.map((t) => {
+    const meta = parseToolMeta(t.tradeDescription);
     const isReservedNow = t.reservations.some((r) => {
       const start = new Date(r.startDate);
       const end = new Date(r.endDate);
@@ -43,7 +46,7 @@ export default async function ToolsPage() {
       t.ratings.length > 0
         ? Math.round((t.ratings.reduce((s, r) => s + r.stars, 0) / t.ratings.length) * 10) / 10
         : null;
-    return { ...t, isAvailable: !isReservedNow, avgRating: avg };
+    return { ...t, isAvailable: !isReservedNow, avgRating: avg, toolMeta: meta };
   });
 
   return (
@@ -53,14 +56,14 @@ export default async function ToolsPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-800">🔨 Herramientas Compartidas</h1>
             <p className="text-gray-500 text-sm mt-1">
-              Pide prestado lo que necesitas · Comparte lo que tienes
+              Alquila lo que necesitas por hora o por día · Comparte lo que tienes
             </p>
           </div>
           <Link
             href="/listings/new?type=tool"
             className="bg-green-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-green-800 transition-colors min-h-[44px] flex items-center gap-2"
           >
-            + Compartir herramienta
+            + Publicar herramienta
           </Link>
         </div>
       </div>
@@ -71,13 +74,13 @@ export default async function ToolsPage() {
             <p className="text-4xl mb-3">🔨</p>
             <p className="text-gray-600 font-semibold">No hay herramientas disponibles aún</p>
             <p className="text-gray-400 text-sm mt-1">
-              ¡Sé el primero en compartir una herramienta con la comunidad!
+              ¡Sé el primero en publicar una herramienta para alquilar en la comunidad!
             </p>
             <Link
               href="/listings/new?type=tool"
               className="inline-flex items-center mt-5 bg-green-700 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-green-800 transition-colors min-h-[44px]"
             >
-              + Compartir mi herramienta
+              + Publicar mi herramienta
             </Link>
           </div>
         ) : (
@@ -87,19 +90,27 @@ export default async function ToolsPage() {
                 key={tool.id}
                 className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow"
               >
-                <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-32 flex items-center justify-center text-5xl">
-                  🔨
-                </div>
+                {tool.images[0]?.url ? (
+                  <img
+                    src={tool.images[0].url}
+                    alt={tool.title}
+                    className="h-32 w-full object-cover"
+                  />
+                ) : (
+                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-32 flex items-center justify-center text-5xl">
+                    🔨
+                  </div>
+                )}
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-bold text-gray-800 leading-snug">{tool.title}</h3>
-                    {tool.tradeDescription && (
+                    {tool.toolMeta.condition && (
                       <span
                         className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                          conditionColor[tool.tradeDescription] ?? "bg-gray-100 text-gray-600"
+                          conditionColor[tool.toolMeta.condition] ?? "bg-gray-100 text-gray-600"
                         }`}
                       >
-                        {tool.tradeDescription}
+                        {tool.toolMeta.condition}
                       </span>
                     )}
                   </div>
@@ -115,10 +126,19 @@ export default async function ToolsPage() {
 
                   <p className="text-sm text-gray-600 mt-2 line-clamp-2">{tool.description}</p>
 
-                  {tool.priceCop !== null && (
-                    <p className="text-green-700 font-semibold text-sm mt-1">
-                      ${Number(tool.priceCop).toLocaleString("es-CO")} COP / día
-                    </p>
+                  {(tool.toolMeta.pricePerHourCop !== null || tool.toolMeta.pricePerDayCop !== null) && (
+                    <div className="mt-2 space-y-1">
+                      {tool.toolMeta.pricePerHourCop !== null && (
+                        <p className="text-green-700 font-semibold text-sm">
+                          ${Number(tool.toolMeta.pricePerHourCop).toLocaleString("es-CO")} COP / hora
+                        </p>
+                      )}
+                      {tool.toolMeta.pricePerDayCop !== null && (
+                        <p className="text-green-700 font-semibold text-sm">
+                          ${Number(tool.toolMeta.pricePerDayCop).toLocaleString("es-CO")} COP / día
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   <div
@@ -138,7 +158,7 @@ export default async function ToolsPage() {
                         : "bg-gray-100 text-gray-400 pointer-events-none"
                     }`}
                   >
-                    {tool.isAvailable ? "Solicitar préstamo" : "No disponible"}
+                    {tool.isAvailable ? "Solicitar alquiler" : "No disponible"}
                   </Link>
                 </div>
               </div>

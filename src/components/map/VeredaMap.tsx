@@ -47,7 +47,7 @@ export function VeredaMap({ selectedVeredaId, onSelectVereda }: VeredaMapProps) 
                   ? "bg-green-700 text-white shadow-lg scale-110"
                   : "bg-white text-green-800 border border-green-400 hover:bg-green-100"
               }`}
-              title={v.name}
+              title={`${v.name}${v.sectors.length ? ` · ${v.sectors.join(", ")}` : ""}`}
             >
               <span className="px-1 text-center leading-tight">{v.name}</span>
             </button>

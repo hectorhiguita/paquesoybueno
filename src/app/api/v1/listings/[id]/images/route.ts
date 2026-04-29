@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { uploadImage } from "@/lib/storage";
+import { requireSessionContext } from "@/lib/auth/session";
 
 const MAX_IMAGES = 5;
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -22,10 +23,9 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id: listingId } = await context.params;
 
-  // Auth
-  const userId = request.headers.get("X-User-ID");
-  if (!userId) {
-    return Errors.unauthorized("Se requiere autenticación");
+  const { context: sessionContext, error } = await requireSessionContext(request);
+  if (error || !sessionContext) {
+    return error ?? Errors.unauthorized("Se requiere autenticación");
   }
 
   // Parse multipart form
@@ -66,11 +66,11 @@ export async function POST(
   }
 
   // Verify listing exists
-  let listing: { id: string; images: { id: string }[] } | null;
+  let listing: { id: string; authorId: string; communityId: string; images: { id: string }[] } | null;
   try {
     listing = await prisma.listing.findUnique({
       where: { id: listingId },
-      select: { id: true, images: { select: { id: true } } },
+      select: { id: true, authorId: true, communityId: true, images: { select: { id: true } } },
     });
   } catch (err) {
     console.error("[POST /listings/:id/images] DB error:", err);
@@ -79,6 +79,10 @@ export async function POST(
 
   if (!listing) {
     return Errors.notFound("Listing no encontrado");
+  }
+
+  if (listing.authorId !== sessionContext.userId || listing.communityId !== sessionContext.communityId) {
+    return Errors.forbidden("Solo el autor puede subir imágenes a esta publicación");
   }
 
   // Validate total count including existing images
