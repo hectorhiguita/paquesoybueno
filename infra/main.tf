@@ -55,33 +55,28 @@ module "iam" {
   backups_bucket = module.s3.backups_bucket_arn
 }
 
-# RDS PostgreSQL db.t3.micro — reemplaza el contenedor de postgres
+# ─── SSM Parameter Store — fuente única de secretos ──────────────────────────
+# Los parámetros deben existir antes del primer apply.
+# Créalos con: bash scripts/setup-ssm-params.sh
+#
+# Migración desde Secrets Manager:
+#   Si tienes el recurso anterior en el state, elimínalo con:
+#   terraform state rm module.secrets
+#   (o terraform destroy -target module.secrets para borrar el secret en AWS)
+
+module "ssm" {
+  source      = "./modules/ssm"
+  environment = var.environment
+}
+
+# RDS PostgreSQL — la contraseña viene de SSM para evitar que pase por variables de Terraform
 module "rds" {
   source             = "./modules/rds"
   environment        = var.environment
   vpc_id             = module.vpc.vpc_id
   vpc_cidr           = module.vpc.vpc_cidr
   private_subnet_ids = module.vpc.private_subnet_ids
-  postgres_password  = var.postgres_password
-}
-
-module "secrets" {
-  source               = "./modules/secrets"
-  environment          = var.environment
-  nextauth_secret      = var.nextauth_secret
-  nextauth_url         = var.nextauth_url
-  google_client_id     = var.google_client_id
-  google_client_secret = var.google_client_secret
-  twilio_account_sid   = var.twilio_account_sid
-  twilio_auth_token    = var.twilio_auth_token
-  twilio_phone_number  = var.twilio_phone_number
-  vapid_public_key     = var.vapid_public_key
-  vapid_private_key    = var.vapid_private_key
-  postgres_password    = var.postgres_password
-  assets_bucket_name   = module.s3.assets_bucket_name
-  aws_region           = var.aws_region
-  # DATABASE_URL apunta a RDS
-  database_url         = module.rds.database_url
+  postgres_password  = module.ssm.postgres_password
 }
 
 module "cloudwatch" {
@@ -126,8 +121,6 @@ module "ecs" {
   ecr_repo_url         = module.ecr.app_repo_url
   ecs_task_role_arn    = module.iam.ecs_task_role_arn
   ecs_exec_role_arn    = module.iam.ecs_exec_role_arn
-  secrets_arn          = module.secrets.secret_arn
   log_group_app        = module.cloudwatch.log_group_app
-  postgres_password    = var.postgres_password
   ecs_cluster_name     = "practicas-itm"
 }

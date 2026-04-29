@@ -60,6 +60,51 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
   }
 }
 
+export async function sendActivationEmail(
+  email: string,
+  name: string,
+  activationUrl: string
+): Promise<EmailSendResult> {
+  return sendEmail({
+    to: email,
+    subject: "Activa tu cuenta en Santa Elena Platform",
+    text: [
+      `Hola ${name},`,
+      "",
+      "Gracias por registrarte en Santa Elena Platform.",
+      "",
+      "Para activar tu cuenta y crear tu contraseña, haz clic en el siguiente enlace:",
+      "",
+      activationUrl,
+      "",
+      "Este enlace es de uso unico y expira en 24 horas.",
+      "",
+      "Si no creaste esta cuenta, ignora este mensaje.",
+      "",
+      "-- Equipo Santa Elena Platform",
+    ].join("\n"),
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#15803d">Bienvenido a Santa Elena Platform</h2>
+        <p>Hola <strong>${name}</strong>,</p>
+        <p>Gracias por registrarte. Para activar tu cuenta y crear tu contrasena, haz clic en el boton:</p>
+        <p style="text-align:center;margin:32px 0">
+          <a href="${activationUrl}"
+             style="background:#15803d;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">
+            Activar mi cuenta
+          </a>
+        </p>
+        <p style="color:#6b7280;font-size:13px">
+          Este enlace es de uso unico y expira en 24 horas.<br>
+          Si no creaste esta cuenta, ignora este mensaje.
+        </p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+        <p style="color:#9ca3af;font-size:12px">Santa Elena Platform &mdash; Comunidad rural de Santa Elena, Medellin</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendAccountLockedEmail(
   email: string,
   lockedUntil: Date

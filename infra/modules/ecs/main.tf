@@ -35,6 +35,13 @@ resource "aws_security_group" "ecs_tasks" {
 }
 
 # ─── Task Definition — App Next.js ────────────────────────────────────────────
+# Los secretos se inyectan desde SSM Parameter Store.
+# El ECS agent los resuelve en tiempo de arranque usando la execution role.
+
+locals {
+  # Prefijo base de los ARNs de SSM — cada parámetro es su propio recurso.
+  ssm_prefix = "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter/santa-elena/${var.environment}"
+}
 
 resource "aws_ecs_task_definition" "app" {
   family                   = "santa-elena-app-${var.environment}"
@@ -58,23 +65,27 @@ resource "aws_ecs_task_definition" "app" {
 
       environment = [
         { name = "NODE_ENV", value = "production" },
-        { name = "PORT",     value = "3000" }
+        { name = "PORT", value = "3000" }
       ]
 
+      # Cada entrada apunta al ARN del parámetro SSM correspondiente.
+      # El nombre del parámetro SSM sigue la convención:
+      #   /santa-elena/<environment>/<NOMBRE>
       secrets = [
-        { name = "NEXTAUTH_SECRET",      valueFrom = "${var.secrets_arn}:NEXTAUTH_SECRET::" },
-        { name = "NEXTAUTH_URL",         valueFrom = "${var.secrets_arn}:NEXTAUTH_URL::" },
-        { name = "DATABASE_URL",         valueFrom = "${var.secrets_arn}:DATABASE_URL::" },
-        { name = "GOOGLE_CLIENT_ID",     valueFrom = "${var.secrets_arn}:GOOGLE_CLIENT_ID::" },
-        { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${var.secrets_arn}:GOOGLE_CLIENT_SECRET::" },
-        { name = "TWILIO_ACCOUNT_SID",   valueFrom = "${var.secrets_arn}:TWILIO_ACCOUNT_SID::" },
-        { name = "TWILIO_AUTH_TOKEN",    valueFrom = "${var.secrets_arn}:TWILIO_AUTH_TOKEN::" },
-        { name = "TWILIO_PHONE_NUMBER",  valueFrom = "${var.secrets_arn}:TWILIO_PHONE_NUMBER::" },
-        { name = "VAPID_PUBLIC_KEY",     valueFrom = "${var.secrets_arn}:VAPID_PUBLIC_KEY::" },
-        { name = "VAPID_PRIVATE_KEY",    valueFrom = "${var.secrets_arn}:VAPID_PRIVATE_KEY::" },
-        { name = "AWS_S3_BUCKET",        valueFrom = "${var.secrets_arn}:AWS_S3_BUCKET::" },
-        { name = "AWS_REGION",           valueFrom = "${var.secrets_arn}:AWS_REGION::" },
-        { name = "SES_FROM_EMAIL",       valueFrom = "${var.secrets_arn}:SES_FROM_EMAIL::" }
+        { name = "NEXTAUTH_SECRET", valueFrom = "${local.ssm_prefix}/NEXTAUTH_SECRET" },
+        { name = "NEXTAUTH_URL", valueFrom = "${local.ssm_prefix}/NEXTAUTH_URL" },
+        { name = "DATABASE_URL", valueFrom = "${local.ssm_prefix}/DATABASE_URL" },
+        { name = "GOOGLE_CLIENT_ID", valueFrom = "${local.ssm_prefix}/GOOGLE_CLIENT_ID" },
+        { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${local.ssm_prefix}/GOOGLE_CLIENT_SECRET" },
+        { name = "TWILIO_ACCOUNT_SID", valueFrom = "${local.ssm_prefix}/TWILIO_ACCOUNT_SID" },
+        { name = "TWILIO_AUTH_TOKEN", valueFrom = "${local.ssm_prefix}/TWILIO_AUTH_TOKEN" },
+        { name = "TWILIO_PHONE_NUMBER", valueFrom = "${local.ssm_prefix}/TWILIO_PHONE_NUMBER" },
+        { name = "VAPID_PUBLIC_KEY", valueFrom = "${local.ssm_prefix}/VAPID_PUBLIC_KEY" },
+        { name = "VAPID_PRIVATE_KEY", valueFrom = "${local.ssm_prefix}/VAPID_PRIVATE_KEY" },
+        { name = "SES_FROM_EMAIL", valueFrom = "${local.ssm_prefix}/SES_FROM_EMAIL" },
+        { name = "ADMIN_USERNAME", valueFrom = "${local.ssm_prefix}/ADMIN_USERNAME" },
+        { name = "ADMIN_PASSWORD_HASH", valueFrom = "${local.ssm_prefix}/ADMIN_PASSWORD_HASH" },
+        { name = "CRON_SECRET", valueFrom = "${local.ssm_prefix}/CRON_SECRET" }
       ]
 
       logConfiguration = {

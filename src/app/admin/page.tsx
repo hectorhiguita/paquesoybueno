@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PROVIDERS, MARKET_ITEMS, TOOLS } from "@/lib/mock-data";
 
 const REPORTS = [
@@ -27,18 +26,7 @@ export default function AdminPage() {
   const pendingReports = REPORTS.filter((r) => r.status === "pending").length;
 
   return (
-    <main className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-green-800 text-white px-6 py-5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">⚙️ Panel de Administración</h1>
-            <p className="text-green-200 text-sm mt-0.5">Santa Elena Platform</p>
-          </div>
-          <Link href="/" className="text-green-200 text-sm hover:text-white">← Ver sitio</Link>
-        </div>
-      </div>
-
+    <main>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
