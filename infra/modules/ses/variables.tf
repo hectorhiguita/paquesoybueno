@@ -16,3 +16,9 @@ variable "ecs_task_role_name" {
   type        = string
   description = "Name of the ECS task IAM role to attach SES permissions"
 }
+
+variable "create_smtp_iam_user" {
+  type        = bool
+  description = "Create an IAM user and access key for SES SMTP integrations outside ECS"
+  default     = false
+}

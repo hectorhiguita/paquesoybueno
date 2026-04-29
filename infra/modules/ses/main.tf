@@ -57,3 +57,35 @@ resource "aws_iam_role_policy" "ecs_ses" {
     }]
   })
 }
+
+# Optional SMTP IAM user for integrations that cannot use the ECS task role.
+resource "aws_iam_user" "smtp" {
+  count = var.create_smtp_iam_user ? 1 : 0
+  name  = "ses-smtp-${var.environment}"
+  path  = "/service-users/"
+}
+
+resource "aws_iam_user_policy" "smtp" {
+  count = var.create_smtp_iam_user ? 1 : 0
+  name  = "ses-smtp-send-${var.environment}"
+  user  = aws_iam_user.smtp[0].name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ses:SendRawEmail", "ses:SendEmail"]
+      Resource = aws_ses_domain_identity.main.arn
+      Condition = {
+        StringEquals = {
+          "ses:FromAddress" = "noreply@${var.domain_name}"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_access_key" "smtp" {
+  count = var.create_smtp_iam_user ? 1 : 0
+  user  = aws_iam_user.smtp[0].name
+}

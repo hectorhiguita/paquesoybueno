@@ -8,7 +8,9 @@ import { Prisma } from "@prisma/client";
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
+      findFirst: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -73,8 +75,14 @@ describe("Property 2: Mensaje de error de duplicado no revela campo", () => {
       fc.asyncProperty(
         fc.constantFrom("email" as const, "phone" as const, "both" as const),
         async (scenario) => {
-          const mockCreate = vi.mocked(prisma.user.create);
-          mockCreate.mockRejectedValueOnce(makeP2002Error(scenario));
+          vi.mocked(prisma.user.findFirst).mockResolvedValueOnce({
+            id: "existing-user",
+            email: scenario === "phone" ? "other@example.com" : VALID_BODY.email,
+            phone: scenario === "email" ? "3009998888" : VALID_BODY.phone,
+            name: VALID_BODY.name,
+            passwordHash: "hashed-password",
+            phoneVerified: true,
+          } as never);
 
           const res = await POST(makeRequest(VALID_BODY));
           const json = await res.json();

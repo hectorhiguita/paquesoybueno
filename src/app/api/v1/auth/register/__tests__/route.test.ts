@@ -5,7 +5,9 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
+      findFirst: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -37,6 +39,7 @@ function makeRequest(body: unknown): NextRequest {
 describe("POST /api/v1/auth/register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.user.findFirst).mockResolvedValue(null as never);
   });
 
   // --- Validation (Req 1.1) ---
@@ -128,10 +131,14 @@ describe("POST /api/v1/auth/register", () => {
   // --- Duplicate error (Req 1.4) ---
 
   it("returns 409 with generic message when email is duplicated", async () => {
-    const mockCreate = vi.mocked(prisma.user.create);
-    mockCreate.mockRejectedValueOnce(
-      { code: "P2002" } as never
-    );
+    vi.mocked(prisma.user.findFirst).mockResolvedValueOnce({
+      id: "existing-user",
+      email: VALID_BODY.email,
+      phone: VALID_BODY.phone,
+      name: VALID_BODY.name,
+      passwordHash: "hashed-password",
+      phoneVerified: true,
+    } as never);
 
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(409);
@@ -143,10 +150,14 @@ describe("POST /api/v1/auth/register", () => {
   });
 
   it("returns 409 with SAME generic message when phone is duplicated", async () => {
-    const mockCreate = vi.mocked(prisma.user.create);
-    mockCreate.mockRejectedValueOnce(
-      { code: "P2002" } as never
-    );
+    vi.mocked(prisma.user.findFirst).mockResolvedValueOnce({
+      id: "existing-user",
+      email: "other@example.com",
+      phone: VALID_BODY.phone,
+      name: VALID_BODY.name,
+      passwordHash: "hashed-password",
+      phoneVerified: true,
+    } as never);
 
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(409);

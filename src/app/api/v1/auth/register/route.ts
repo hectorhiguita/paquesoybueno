@@ -40,22 +40,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { name, email, phone, communityId } = parsed.data;
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = normalizeColombianPhone(phone);
 
-  // Crear usuario sin contraseña — se establece al activar la cuenta
   let userId: string;
   try {
-    const user = await prisma.user.create({
-      data: {
-        id: randomUUID(),
+    const existingUser = await prisma.user.findFirst({
+      where: {
         communityId,
-        email,
-        phone,
-        name,
-        // Sin passwordHash — se establece en el flujo de activación
+        OR: [
+          { email: normalizedEmail },
+          {
+            phone: {
+              in: buildPhoneCandidates(normalizedPhone),
+            },
+          },
+        ],
       },
-      select: { id: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        passwordHash: true,
+        phoneVerified: true,
+      },
     });
-    userId = user.id;
+
+    if (existingUser) {
+      const canResumeActivation =
+        existingUser.passwordHash === null || existingUser.phoneVerified === false;
+
+      if (!canResumeActivation) {
+        return NextResponse.json(
+          {
+            error: {
+              code: "CONFLICT",
+              message: "Ya existe una cuenta con estos datos",
+              requestId: randomUUID(),
+            },
+          },
+          { status: 409 }
+        );
+      }
+
+      userId = existingUser.id;
+
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+        },
+      });
+    } else {
+      const user = await prisma.user.create({
+        data: {
+          id: randomUUID(),
+          communityId,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          name,
+          // Sin passwordHash — se establece en el flujo de activación
+        },
+        select: { id: true },
+      });
+      userId = user.id;
+    }
   } catch (err) {
     // Req 1.4: error genérico — no revelar qué campo está duplicado
     if ((err as { code?: string } | null)?.code === "P2002") {
@@ -69,12 +121,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Generar token de activación de único uso (24h)
-  const token = generateActivationToken(userId, email, communityId);
+  const token = generateActivationToken(userId, normalizedEmail, communityId);
   const baseUrl = process.env.NEXTAUTH_URL ?? "https://santaelenacomunidad.online";
   const activationUrl = `${baseUrl}/activate?token=${token}`;
 
   // Enviar email con el link
-  const emailResult = await sendActivationEmail(email, name, activationUrl);
+  const emailResult = await sendActivationEmail(normalizedEmail, name, activationUrl);
   if (!emailResult.success) {
     console.error("[register] Email send failed:", emailResult.error);
     // No fatal — el usuario puede solicitar reenvío
@@ -89,4 +141,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
     { status: 201 }
   );
+}
+
+function normalizeColombianPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("57") && digits.length === 12) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+function buildPhoneCandidates(normalizedPhone: string): string[] {
+  return [normalizedPhone, `57${normalizedPhone}`, `+57${normalizedPhone}`];
 }
