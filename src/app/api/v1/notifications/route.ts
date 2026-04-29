@@ -40,8 +40,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       orderBy: { createdAt: "desc" },
     });
 
+    const sortedNotifications = [...notifications].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
     return NextResponse.json(
-      { data: { notifications, total: notifications.length } },
+      { data: { notifications: sortedNotifications, total: sortedNotifications.length } },
       { status: 200 }
     );
   } catch (err) {

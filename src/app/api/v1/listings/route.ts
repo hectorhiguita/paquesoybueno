@@ -142,7 +142,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const { context, error } = await requireSessionContext(request);
   if (error || !context) {
-    return Errors.unauthorized("Se requiere autenticación para crear un listing");
+    return error ?? Errors.unauthorized("Se requiere autenticación para crear un listing");
   }
   const authorId = context.userId;
 

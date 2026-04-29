@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 
 // Mock Prisma before importing the route
 vi.mock("@/lib/prisma", () => ({
@@ -11,9 +10,9 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-// Mock SMS so we don't hit Twilio
-vi.mock("@/lib/sms", () => ({
-  sendVerificationSms: vi.fn().mockResolvedValue({ success: true }),
+// Mock email so we don't emit console noise or depend on SES
+vi.mock("@/lib/email", () => ({
+  sendActivationEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 import { POST } from "../route";
@@ -107,7 +106,7 @@ describe("POST /api/v1/auth/register", () => {
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.data.userId).toBe("test-user-id");
-    expect(json.data.message).toContain("código de verificación");
+    expect(json.data.message).toContain("activarla");
   });
 
   it("accepts +57 prefixed phone", async () => {
@@ -131,11 +130,7 @@ describe("POST /api/v1/auth/register", () => {
   it("returns 409 with generic message when email is duplicated", async () => {
     const mockCreate = vi.mocked(prisma.user.create);
     mockCreate.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-        code: "P2002",
-        clientVersion: "5.0.0",
-        meta: { target: ["community_id", "email"] },
-      })
+      { code: "P2002" } as never
     );
 
     const res = await POST(makeRequest(VALID_BODY));
@@ -150,11 +145,7 @@ describe("POST /api/v1/auth/register", () => {
   it("returns 409 with SAME generic message when phone is duplicated", async () => {
     const mockCreate = vi.mocked(prisma.user.create);
     mockCreate.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-        code: "P2002",
-        clientVersion: "5.0.0",
-        meta: { target: ["community_id", "phone"] },
-      })
+      { code: "P2002" } as never
     );
 
     const res = await POST(makeRequest(VALID_BODY));
