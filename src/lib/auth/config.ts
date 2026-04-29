@@ -37,6 +37,7 @@ const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 // ---------------------------------------------------------------------------
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   providers: [
     // ------------------------------------------------------------------
     // Credentials provider (Req 1.5, 1.6, 1.7)

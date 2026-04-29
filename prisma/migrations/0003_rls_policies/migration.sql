@@ -87,7 +87,6 @@ BEGIN
     SET active_report_count = active_report_count + 1
     WHERE id = NEW.target_user_id AND NEW.target_user_id IS NOT NULL;
   ELSIF TG_OP = 'UPDATE' THEN
-    -- When a report is resolved or dismissed, decrement the count
     IF OLD.status = 'pending' AND NEW.status IN ('resolved', 'dismissed') THEN
       UPDATE users
       SET active_report_count = GREATEST(0, active_report_count - 1)
