@@ -44,6 +44,18 @@ resource "aws_iam_role_policy" "ecs_exec_ssm" {
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
         Resource = "*"
+      },
+      {
+        # Compatibilidad temporal: algunas task definitions antiguas todavia
+        # pueden referenciar un secret legado en Secrets Manager mientras
+        # terminamos la migracion a SSM.
+        Sid    = "SecretsManagerFallback"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "arn:aws:secretsmanager:*:*:secret:santa-elena/*"
       }
     ]
   })

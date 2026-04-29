@@ -105,28 +105,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
 
-      - name: Obtener task definition actual
+      - name: Verificar task definition activa del servicio
         run: |
-          aws ecs describe-task-definition \
-            --task-definition santa-elena-app-prod \
-            --query 'taskDefinition' \
-            --output json > task-definition.json
+          aws ecs describe-services \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --query 'services[0].taskDefinition' \
+            --output text
 
-      - name: Actualizar imagen en task definition
-        id: update-task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: app
-          image: ${{ env.ECR_REPO }}:${{ needs.build.outputs.image_tag }}
+      - name: Forzar nuevo despliegue con la task definition administrada por Terraform
+        run: |
+          aws ecs update-service \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ env.ECS_SERVICE }}" \
+            --force-new-deployment >/tmp/ecs-update.json
 
-      - name: Deploy a ECS (rolling update)
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.update-task-def.outputs.task-definition }}
-          service:         ${{ env.ECS_SERVICE }}
-          cluster:         ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          aws ecs wait services-stable \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}"
 
       - name: Resumen del despliegue
         run: |
