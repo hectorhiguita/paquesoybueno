@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 const CATEGORY_ICONS: Record<string, string> = {
   jardineria: "🌿",
   electricidad: "⚡",

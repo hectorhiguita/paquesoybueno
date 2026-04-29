@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { RegisterForm } from "./RegisterForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function RegisterPage() {
   const veredas = await prisma.vereda.findMany({
     where: { communityId: SANTA_ELENA_COMMUNITY_ID },

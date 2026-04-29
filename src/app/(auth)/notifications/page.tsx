@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/config";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const typeIcon: Record<string, string> = {
   message: "✉️",
   rating: "⭐",
