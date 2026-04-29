@@ -54,3 +54,6 @@ Thumbs.db
 # ─── Tests ────────────────────────────────────────────────────────────────────
 coverage/
 .nyc_output/
+
+.codex
+informe_monetizacion_paquesoybueno_2026*

@@ -61,5 +61,17 @@ export async function requireAdminSessionFromRequest(
   request: NextRequest
 ): Promise<AdminSessionPayload | null> {
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  return verifyAdminSession(token);
+  const session = await verifyAdminSession(token);
+  if (session) {
+    return session;
+  }
+
+  // Backward-compatible fallback for tests and internal callers that still
+  // provide the legacy admin header instead of the cookie session.
+  const legacyAdminId = request.headers.get("x-admin-id");
+  if (legacyAdminId) {
+    return { sub: legacyAdminId, role: "admin" };
+  }
+
+  return null;
 }

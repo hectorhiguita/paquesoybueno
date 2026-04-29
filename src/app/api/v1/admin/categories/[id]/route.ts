@@ -53,8 +53,8 @@ export async function PATCH(
   // Check category exists
   let existing: { id: string } | null;
   try {
-    existing = await prisma.category.findFirst({
-      where: { id, communityId: SANTA_ELENA_COMMUNITY_ID },
+    existing = await prisma.category.findUnique({
+      where: { id },
       select: { id: true },
     });
   } catch (err) {
