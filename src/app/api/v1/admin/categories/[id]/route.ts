@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { z } from "zod";
+import { requireAdminSessionFromRequest } from "@/lib/admin/session";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
 const updateCategorySchema = z.object({
   name: z.string().min(2).optional(),
@@ -24,9 +26,9 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const { id } = await context.params;
 
-  const adminId = request.headers.get("X-Admin-ID");
-  if (!adminId) {
-    return Errors.unauthorized("Se requiere X-Admin-ID");
+  const adminSession = await requireAdminSessionFromRequest(request);
+  if (!adminSession) {
+    return Errors.unauthorized("Sesión de administrador expirada");
   }
 
   let body: unknown;
@@ -51,8 +53,8 @@ export async function PATCH(
   // Check category exists
   let existing: { id: string } | null;
   try {
-    existing = await prisma.category.findUnique({
-      where: { id },
+    existing = await prisma.category.findFirst({
+      where: { id, communityId: SANTA_ELENA_COMMUNITY_ID },
       select: { id: true },
     });
   } catch (err) {
@@ -72,6 +74,9 @@ export async function PATCH(
 
     return NextResponse.json({ data: { category } }, { status: 200 });
   } catch (err) {
+    if ((err as { code?: string } | null)?.code === "P2002") {
+      return Errors.validation("Ya existe una categoría con ese nombre", "name");
+    }
     console.error("[PATCH /admin/categories/:id] DB update error:", err);
     return Errors.internal();
   }

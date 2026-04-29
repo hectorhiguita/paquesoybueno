@@ -21,11 +21,11 @@ export interface EmailOptions {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<EmailSendResult> {
-  const fromEmail = process.env.SES_FROM_EMAIL;
+  const fromEmail = process.env.SES_FROM_EMAIL || "noreply@santaelenacomunidad.online";
   const region    = process.env.AWS_REGION ?? "us-east-1";
 
-  // Dev/test fallback — no SES configured
-  if (!fromEmail) {
+  // Dev/test fallback explícito
+  if (!process.env.SES_FROM_EMAIL && process.env.NODE_ENV !== "production") {
     console.log(`[EMAIL DEV] To: ${options.to} | Subject: ${options.subject}\n${options.text}`);
     return { success: true };
   }
@@ -52,7 +52,12 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
     const result = await client.send(command);
     return { success: true, messageId: result.MessageId };
   } catch (err) {
-    console.error("[email] SES error:", err);
+    console.error("[email] SES error:", {
+      region,
+      fromEmail,
+      to: options.to,
+      error: err,
+    });
     return {
       success: false,
       error: err instanceof Error ? err.message : "SES send error",

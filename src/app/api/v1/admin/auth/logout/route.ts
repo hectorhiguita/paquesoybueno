@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clearAdminSessionCookie } from "@/lib/admin/session";
 
 /**
  * POST /api/v1/admin/auth/logout
@@ -10,13 +11,7 @@ export async function POST(): Promise<NextResponse> {
     { status: 200 }
   );
 
-  response.cookies.set("admin_session", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 0,
-    path: "/",
-  });
+  clearAdminSessionCookie(response);
 
   return response;
 }

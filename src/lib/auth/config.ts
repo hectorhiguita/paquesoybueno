@@ -31,6 +31,7 @@ interface AppUser extends User {
 const MAX_FAILED_ATTEMPTS = 5;
 /** How long the account stays locked after reaching the threshold. */
 const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_MAX_AGE_SECONDS = 15 * 60;
 
 // ---------------------------------------------------------------------------
 // NextAuth config
@@ -183,6 +184,11 @@ export const authConfig: NextAuthConfig = {
 
   session: {
     strategy: "jwt",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+  },
+
+  jwt: {
+    maxAge: SESSION_MAX_AGE_SECONDS,
   },
 };
 

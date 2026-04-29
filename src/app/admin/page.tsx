@@ -1,21 +1,10 @@
 import { PROVIDERS, MARKET_ITEMS, TOOLS } from "@/lib/mock-data";
+import { AdminCategoriesPanel } from "./AdminCategoriesPanel";
 
 const REPORTS = [
   { id: "r1", reporter: "Ana Gómez", target: "Anuncio: Nevera Samsung", reason: "Precio sospechoso", status: "pending", date: "Hace 1 hora" },
   { id: "r2", reporter: "Pedro Álvarez", target: "Usuario: Miguel Ruiz", reason: "Comportamiento inapropiado", status: "pending", date: "Hace 3 horas" },
   { id: "r3", reporter: "Claudia Herrera", target: "Anuncio: Bicicleta Trek", reason: "Descripción engañosa", status: "resolved", date: "Ayer" },
-];
-
-const CATEGORIES_ADMIN = [
-  { name: "Jardinería", listings: 2, active: true },
-  { name: "Electricidad", listings: 2, active: true },
-  { name: "Plomería", listings: 1, active: true },
-  { name: "Construcción", listings: 1, active: true },
-  { name: "Tecnología", listings: 1, active: true },
-  { name: "Transporte", listings: 1, active: true },
-  { name: "Electrodomésticos", listings: 1, active: true },
-  { name: "Agricultura", listings: 1, active: true },
-  { name: "Cocina", listings: 0, active: false },
 ];
 
 export default function AdminPage() {
@@ -80,35 +69,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Gestión de categorías */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-800">📂 Categorías</h2>
-              <button className="text-sm bg-green-700 text-white px-3 py-1.5 rounded-lg hover:bg-green-800 transition-colors min-h-[44px] flex items-center">
-                + Nueva
-              </button>
-            </div>
-            <div className="space-y-2">
-              {CATEGORIES_ADMIN.map((cat) => (
-                <div key={cat.name} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-                  <div>
-                    <p className="font-semibold text-sm text-gray-800">{cat.name}</p>
-                    <p className="text-xs text-gray-500">{cat.listings} anuncios</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      cat.active ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"
-                    }`}>
-                      {cat.active ? "Activa" : "Inactiva"}
-                    </span>
-                    <button className="text-xs text-gray-400 hover:text-gray-600 min-h-[44px] px-2">
-                      {cat.active ? "Desactivar" : "Activar"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <AdminCategoriesPanel />
         </div>
 
         {/* Miembros */}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { z } from "zod";
+import { requireAdminSessionFromRequest } from "@/lib/admin/session";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
 const createCategorySchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -9,21 +11,43 @@ const createCategorySchema = z.object({
   description: z.string().optional(),
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/v1/admin/categories
-// Create a new category
-// Requirements: 11.1, 11.2
-// ---------------------------------------------------------------------------
-
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const adminId = request.headers.get("X-Admin-ID");
-  if (!adminId) {
-    return Errors.unauthorized("Se requiere X-Admin-ID");
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const adminSession = await requireAdminSessionFromRequest(request);
+  if (!adminSession) {
+    return Errors.unauthorized("Sesión de administrador expirada");
   }
 
-  const communityId = request.headers.get("X-Community-ID");
-  if (!communityId) {
-    return Errors.validation("El header X-Community-ID es requerido", "communityId");
+  try {
+    const categories = await prisma.category.findMany({
+      where: { communityId: SANTA_ELENA_COMMUNITY_ID },
+      include: {
+        _count: { select: { listings: true } },
+      },
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+    });
+
+    return NextResponse.json({
+      data: {
+        categories: categories.map((category) => ({
+          id: category.id,
+          name: category.name,
+          icon: category.icon,
+          description: category.description,
+          active: category.active,
+          listingsCount: category._count.listings,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("[GET /admin/categories] DB error:", err);
+    return Errors.internal();
+  }
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const adminSession = await requireAdminSessionFromRequest(request);
+  if (!adminSession) {
+    return Errors.unauthorized("Sesión de administrador expirada");
   }
 
   let body: unknown;
@@ -44,7 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const category = await prisma.category.create({
       data: {
-        communityId,
+        communityId: SANTA_ELENA_COMMUNITY_ID,
         name,
         icon: icon ?? null,
         description: description ?? null,
@@ -54,6 +78,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ data: { category } }, { status: 201 });
   } catch (err) {
+    if ((err as { code?: string } | null)?.code === "P2002") {
+      return Errors.validation("Ya existe una categoría con ese nombre", "name");
+    }
     console.error("[POST /admin/categories] DB error:", err);
     return Errors.internal();
   }

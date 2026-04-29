@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { signAdminSession, setAdminSessionCookie, verifyAdminSession } from "@/lib/admin/session";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -13,21 +13,35 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   // ──────────────────────────────────────────────────────
-  // Protección de rutas admin
+  // Protección de rutas admin + sesión deslizante por inactividad
   // ──────────────────────────────────────────────────────
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const sessionToken = request.cookies.get("admin_session")?.value;
+  const isAdminPage = pathname.startsWith("/admin");
+  const isAdminApi = pathname.startsWith("/api/v1/admin");
+  const isAdminLogin = pathname === "/admin/login" || pathname === "/api/v1/admin/auth/login";
+  const isAdminLogout = pathname === "/api/v1/admin/auth/logout";
 
-    if (sessionToken) {
-      try {
-        const secret = new TextEncoder().encode(
-          process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production"
-        );
-        await jwtVerify(sessionToken, secret, { audience: "admin-panel" });
-        return NextResponse.next();
-      } catch {
-        // Token inválido o expirado → redirigir a login
-      }
+  if ((isAdminPage || isAdminApi) && !isAdminLogin && !isAdminLogout) {
+    const sessionToken = request.cookies.get("admin_session")?.value;
+    const session = await verifyAdminSession(sessionToken);
+
+    if (session) {
+      const response = NextResponse.next();
+      const refreshedToken = await signAdminSession();
+      setAdminSessionCookie(response, refreshedToken);
+      return response;
+    }
+
+    if (isAdminApi) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Sesión de administrador expirada",
+            requestId: crypto.randomUUID(),
+          },
+        },
+        { status: 401 }
+      );
     }
 
     const loginUrl = new URL("/admin/login", request.url);

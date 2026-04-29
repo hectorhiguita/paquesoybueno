@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { SignJWT } from "jose";
 import { Errors } from "@/lib/api/errors";
 import { verifyPassword } from "@/lib/auth/password";
-
-const SESSION_DURATION_SECONDS = 60 * 60 * 8; // 8 horas
+import { signAdminSession, setAdminSessionCookie } from "@/lib/admin/session";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -59,31 +57,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Emitir JWT firmado con NEXTAUTH_SECRET
-  const secret = new TextEncoder().encode(
-    process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production"
-  );
-
-  const token = await new SignJWT({ role: "admin" })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject("admin")
-    .setAudience("admin-panel")
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
-    .sign(secret);
+  const token = await signAdminSession();
 
   const response = NextResponse.json(
     { data: { message: "Autenticado correctamente" } },
     { status: 200 }
   );
 
-  response.cookies.set("admin_session", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_DURATION_SECONDS,
-    path: "/",
-  });
+  setAdminSessionCookie(response, token);
 
   return response;
 }

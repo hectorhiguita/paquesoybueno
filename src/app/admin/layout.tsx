@@ -1,10 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+
+const ADMIN_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // No aplicar el wrapper en la página de login
   if (pathname === "/admin/login") return <>{children}</>;
@@ -13,6 +17,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     await fetch("/api/v1/admin/auth/logout", { method: "POST" });
     router.push("/admin/login");
   };
+
+  useEffect(() => {
+    const resetTimer = () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        void handleLogout();
+      }, ADMIN_IDLE_TIMEOUT_MS);
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "scroll",
+      "touchstart",
+    ];
+
+    resetTimer();
+    events.forEach((event) => window.addEventListener(event, resetTimer, { passive: true }));
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100">
