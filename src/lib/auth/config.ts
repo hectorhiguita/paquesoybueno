@@ -8,7 +8,7 @@
  * Requirements: 1.5, 1.6, 1.7, 1.8
  */
 
-import NextAuth, { type NextAuthConfig } from "next-auth";
+import NextAuth, { type NextAuthConfig, type User } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
@@ -16,14 +16,19 @@ import { verifyPassword } from "@/lib/auth/password";
 import { sendAccountLockedEmail } from "@/lib/email";
 import { loginSchema } from "@/lib/validations/auth";
 
+interface AppUser extends User {
+  communityId: string;
+  role: "member" | "admin";
+  isVerifiedProvider: boolean;
+  phoneVerified: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Number of failed attempts before locking the account. */
 const MAX_FAILED_ATTEMPTS = 5;
-/** Window in milliseconds within which failed attempts are counted. */
-const ATTEMPT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 /** How long the account stays locked after reaching the threshold. */
 const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -100,10 +105,10 @@ export const authConfig: NextAuthConfig = {
           email: user.email,
           name: user.name,
           communityId: user.communityId,
-          role: user.role,
+          role: user.role as "member" | "admin",
           isVerifiedProvider: user.isVerifiedProvider,
           phoneVerified: user.phoneVerified,
-        };
+        } satisfies AppUser;
       },
     }),
 
@@ -127,12 +132,12 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user, account }) {
       if (user) {
-        // First sign-in: persist custom fields into the JWT
-        token.userId = user.id;
-        token.communityId = (user as Record<string, unknown>).communityId as string;
-        token.role = (user as Record<string, unknown>).role as string;
-        token.isVerifiedProvider = (user as Record<string, unknown>).isVerifiedProvider as boolean;
-        token.phoneVerified = (user as Record<string, unknown>).phoneVerified as boolean;
+        const appUser = user as AppUser;
+        token.userId = appUser.id ?? "";
+        token.communityId = appUser.communityId;
+        token.role = appUser.role;
+        token.isVerifiedProvider = appUser.isVerifiedProvider;
+        token.phoneVerified = appUser.phoneVerified;
       }
 
       // Google OAuth first login: check phone verification (Req 1.8)
@@ -145,12 +150,11 @@ export const authConfig: NextAuthConfig = {
         if (dbUser) {
           token.userId = dbUser.id;
           token.communityId = dbUser.communityId;
-          token.role = dbUser.role;
+          token.role = dbUser.role as "member" | "admin";
           token.isVerifiedProvider = dbUser.isVerifiedProvider;
           token.phoneVerified = dbUser.phoneVerified;
           token.requiresPhoneVerification = !dbUser.phoneVerified;
         } else {
-          // New Google user — will need phone verification
           token.requiresPhoneVerification = true;
         }
       }
@@ -159,14 +163,14 @@ export const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.userId as string;
-        (session as Record<string, unknown> & typeof session).communityId = token.communityId;
-        (session as Record<string, unknown> & typeof session).role = token.role;
-        (session as Record<string, unknown> & typeof session).isVerifiedProvider = token.isVerifiedProvider;
-        (session as Record<string, unknown> & typeof session).phoneVerified = token.phoneVerified;
-        (session as Record<string, unknown> & typeof session).requiresPhoneVerification = token.requiresPhoneVerification;
+      if (session.user) {
+        session.user.id = token.userId;
       }
+      session.communityId = token.communityId;
+      session.role = token.role;
+      session.isVerifiedProvider = token.isVerifiedProvider;
+      session.phoneVerified = token.phoneVerified;
+      session.requiresPhoneVerification = token.requiresPhoneVerification;
       return session;
     },
   },

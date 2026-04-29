@@ -1,13 +1,107 @@
 import Link from "next/link";
-import { PROVIDERS, MESSAGES, NOTIFICATIONS, TOOLS } from "@/lib/mock-data";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth/config";
+import { prisma } from "@/lib/prisma";
 
-// Simula el usuario logueado
-const ME = PROVIDERS[0]; // Carlos Restrepo
+export default async function DashboardPage() {
+  const session = await auth();
+  if (!session) redirect("/login");
 
-export default function DashboardPage() {
-  const unreadMessages = MESSAGES.filter((m) => m.unread).length;
-  const unreadNotifs = NOTIFICATIONS.filter((n) => !n.read).length;
-  const myTools = TOOLS.filter((t) => t.owner === ME.name);
+  const userId = session.user.id;
+  const communityId = session.communityId;
+
+  const [user, unreadMessages, unreadNotifs, myListings] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        isVerifiedProvider: true,
+        _count: {
+          select: { ratingsReceived: true },
+        },
+      },
+    }),
+    prisma.message.count({
+      where: {
+        communityId,
+        delivered: false,
+        thread: {
+          OR: [{ participantA: userId }, { participantB: userId }],
+        },
+        senderId: { not: userId },
+      },
+    }),
+    prisma.notification.count({
+      where: {
+        userId,
+        communityId,
+        read: false,
+        expiresAt: { gt: new Date() },
+      },
+    }),
+    prisma.listing.findMany({
+      where: { authorId: userId, communityId },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+        createdAt: true,
+        _count: { select: { ratings: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+  ]);
+
+  if (!user) redirect("/login");
+
+  const avgRatingResult = await prisma.rating.aggregate({
+    where: { providerId: userId, communityId },
+    _avg: { stars: true },
+    _count: { stars: true },
+  });
+  const avgRating = avgRatingResult._avg.stars
+    ? Math.round(avgRatingResult._avg.stars * 10) / 10
+    : null;
+
+  const recentThreads = await prisma.messageThread.findMany({
+    where: {
+      communityId,
+      OR: [{ participantA: userId }, { participantB: userId }],
+    },
+    include: {
+      messages: {
+        orderBy: { sentAt: "desc" },
+        take: 1,
+        select: { content: true, sentAt: true, senderId: true },
+      },
+      userA: { select: { id: true, name: true } },
+      userB: { select: { id: true, name: true } },
+    },
+    orderBy: { lastMessageAt: "desc" },
+    take: 3,
+  });
+
+  const toolListings = myListings.filter((l) => l.type === "tool");
+
+  const typeLabel: Record<string, string> = {
+    service: "Servicio",
+    sale: "Venta",
+    trade: "Trueque",
+    tool: "Herramienta",
+    rent: "Arriendo",
+  };
+
+  const statusBadge: Record<string, string> = {
+    active: "bg-green-100 text-green-700",
+    inactive: "bg-gray-100 text-gray-500",
+    flagged: "bg-yellow-100 text-yellow-700",
+    pending_review: "bg-orange-100 text-orange-700",
+  };
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -15,7 +109,12 @@ export default function DashboardPage() {
         <div className="max-w-5xl mx-auto">
           <p className="text-gray-500 text-sm">Bienvenido de nuevo</p>
           <h1 className="text-2xl font-bold text-gray-800 mt-0.5">
-            {ME.avatar} {ME.name}
+            {user.name}
+            {user.isVerifiedProvider && (
+              <span className="ml-2 text-sm bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full align-middle">
+                ✓ Verificado
+              </span>
+            )}
           </h1>
         </div>
       </div>
@@ -24,10 +123,30 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Trabajos completados", value: ME.jobs, icon: "🔨", color: "bg-green-50 border-green-200" },
-            { label: "Calificación promedio", value: `⭐ ${ME.rating}`, icon: "⭐", color: "bg-yellow-50 border-yellow-200" },
-            { label: "Mensajes sin leer", value: unreadMessages, icon: "✉️", color: "bg-blue-50 border-blue-200" },
-            { label: "Notificaciones", value: unreadNotifs, icon: "🔔", color: "bg-purple-50 border-purple-200" },
+            {
+              label: "Publicaciones",
+              value: myListings.length,
+              icon: "📋",
+              color: "bg-green-50 border-green-200",
+            },
+            {
+              label: "Calificación",
+              value: avgRating ? `⭐ ${avgRating}` : "—",
+              icon: "⭐",
+              color: "bg-yellow-50 border-yellow-200",
+            },
+            {
+              label: "Mensajes sin leer",
+              value: unreadMessages,
+              icon: "✉️",
+              color: "bg-blue-50 border-blue-200",
+            },
+            {
+              label: "Notificaciones",
+              value: unreadNotifs,
+              icon: "🔔",
+              color: "bg-purple-50 border-purple-200",
+            },
           ].map(({ label, value, icon, color }) => (
             <div key={label} className={`bg-white border rounded-2xl p-5 ${color}`}>
               <p className="text-2xl">{icon}</p>
@@ -42,7 +161,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-bold text-gray-800 mb-4">Acciones rápidas</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { href: "/listings/new", icon: "➕", label: "Publicar servicio" },
+              { href: "/listings/new", icon: "➕", label: "Publicar anuncio" },
               { href: "/messages", icon: "✉️", label: "Ver mensajes" },
               { href: "/notifications", icon: "🔔", label: "Notificaciones" },
               { href: "/tools", icon: "🔨", label: "Herramientas" },
@@ -59,83 +178,125 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Mi perfil */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6">
-          <div className="flex items-start justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-800">Mi perfil de proveedor</h2>
-            <Link href={`/services/${ME.id}`} className="text-sm text-green-700 hover:underline">
-              Ver público →
-            </Link>
-          </div>
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center text-3xl">
-              {ME.avatar}
-            </div>
-            <div>
-              <p className="font-bold text-gray-800">{ME.name}</p>
-              <p className="text-sm text-gray-500">{ME.category} · 📍 {ME.vereda}</p>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {ME.tags.map((tag) => (
-                  <span key={tag} className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mt-4">{ME.description}</p>
-        </div>
-
-        {/* Mensajes recientes */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-800">Mensajes recientes</h2>
-            <Link href="/messages" className="text-sm text-green-700 hover:underline">Ver todos →</Link>
-          </div>
-          <div className="space-y-3">
-            {MESSAGES.slice(0, 3).map((msg) => (
-              <Link
-                key={msg.id}
-                href="/messages"
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-xl flex-shrink-0">
-                  {msg.avatar}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-gray-800">{msg.from}</p>
-                  <p className="text-xs text-gray-500 truncate">{msg.preview}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs text-gray-400">{msg.time}</span>
-                  {msg.unread && <div className="w-2 h-2 bg-green-600 rounded-full" />}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Mis herramientas */}
-        {myTools.length > 0 && (
+        {/* Mis publicaciones */}
+        {myListings.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-800">Mis herramientas compartidas</h2>
-              <Link href="/tools" className="text-sm text-green-700 hover:underline">Ver todas →</Link>
+              <h2 className="text-lg font-bold text-gray-800">Mis publicaciones</h2>
+              <Link href="/listings/new" className="text-sm text-green-700 hover:underline">
+                + Nueva →
+              </Link>
             </div>
-            <div className="space-y-3">
-              {myTools.map((tool) => (
-                <div key={tool.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-                  <span className="text-2xl">{tool.emoji}</span>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm text-gray-800">{tool.name}</p>
-                    <p className="text-xs text-gray-500">{tool.condition}</p>
+            <div className="space-y-2">
+              {myListings.map((listing) => (
+                <div
+                  key={listing.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-gray-800 truncate">{listing.title}</p>
+                    <p className="text-xs text-gray-500">
+                      {typeLabel[listing.type] ?? listing.type} ·{" "}
+                      {listing._count.ratings} calificación
+                      {listing._count.ratings !== 1 ? "es" : ""}
+                    </p>
                   </div>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tool.available ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                    {tool.available ? "Disponible" : "Prestada"}
+                  <span
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${statusBadge[listing.status] ?? "bg-gray-100 text-gray-500"}`}
+                  >
+                    {listing.status === "active"
+                      ? "Activo"
+                      : listing.status === "flagged"
+                        ? "En revisión"
+                        : listing.status === "pending_review"
+                          ? "Pendiente"
+                          : "Inactivo"}
                   </span>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Mensajes recientes */}
+        {recentThreads.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Mensajes recientes</h2>
+              <Link href="/messages" className="text-sm text-green-700 hover:underline">
+                Ver todos →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recentThreads.map((thread) => {
+                const other = thread.userA.id === userId ? thread.userB : thread.userA;
+                const lastMsg = thread.messages[0];
+                const isUnread =
+                  !!lastMsg && lastMsg.senderId !== userId;
+                return (
+                  <Link
+                    key={thread.id}
+                    href={`/messages?thread=${thread.id}`}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0 font-semibold text-green-700">
+                      {other.name[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-gray-800">{other.name}</p>
+                      {lastMsg && (
+                        <p className="text-xs text-gray-500 truncate">{lastMsg.content}</p>
+                      )}
+                    </div>
+                    {isUnread && <div className="w-2 h-2 bg-green-600 rounded-full flex-shrink-0" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Herramientas compartidas */}
+        {toolListings.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Mis herramientas compartidas</h2>
+              <Link href="/tools" className="text-sm text-green-700 hover:underline">
+                Ver todas →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {toolListings.map((tool) => (
+                <div key={tool.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                  <span className="text-2xl">🔨</span>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm text-gray-800">{tool.title}</p>
+                  </div>
+                  <span
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusBadge[tool.status] ?? "bg-gray-100 text-gray-500"}`}
+                  >
+                    {tool.status === "active" ? "Disponible" : "No disponible"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {myListings.length === 0 && recentThreads.length === 0 && (
+          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
+            <p className="text-4xl mb-3">🌱</p>
+            <p className="text-gray-700 font-semibold">¡Tu perfil está listo!</p>
+            <p className="text-gray-400 text-sm mt-1">
+              Publica tu primer servicio o herramienta para empezar.
+            </p>
+            <Link
+              href="/listings/new"
+              className="inline-flex items-center mt-5 bg-green-700 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-green-800 transition-colors min-h-[44px]"
+            >
+              + Crear mi primera publicación
+            </Link>
           </div>
         )}
       </div>

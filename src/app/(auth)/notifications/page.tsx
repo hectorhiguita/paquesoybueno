@@ -1,4 +1,6 @@
-import { NOTIFICATIONS } from "@/lib/mock-data";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth/config";
+import { prisma } from "@/lib/prisma";
 
 const typeIcon: Record<string, string> = {
   message: "✉️",
@@ -14,21 +16,42 @@ const typeBg: Record<string, string> = {
   system: "bg-gray-100",
 };
 
-export default function NotificationsPage() {
-  const unread = NOTIFICATIONS.filter((n) => !n.read);
-  const read = NOTIFICATIONS.filter((n) => n.read);
+export default async function NotificationsPage() {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const notifications = await prisma.notification.findMany({
+    where: {
+      userId: session.user.id,
+      communityId: session.communityId,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const normalized = notifications.map((n) => {
+    const payload = typeof n.payload === "object" && n.payload ? n.payload as Record<string, unknown> : {};
+    return {
+      id: n.id,
+      type: n.type,
+      read: n.read,
+      title: String(payload.title ?? "Notificación"),
+      body: String(payload.body ?? payload.message ?? "Tienes una nueva actualización."),
+      time: n.createdAt.toLocaleString("es-CO"),
+    };
+  });
+
+  const unread = normalized.filter((n) => !n.read);
+  const read = normalized.filter((n) => n.read);
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-6">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+        <div className="max-w-2xl mx-auto">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">🔔 Notificaciones</h1>
             <p className="text-gray-500 text-sm mt-1">{unread.length} sin leer</p>
           </div>
-          <button className="text-sm text-green-700 font-medium hover:underline">
-            Marcar todas como leídas
-          </button>
         </div>
       </div>
 

@@ -1,61 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
+import { requireSessionContext } from "@/lib/auth/session";
 
-// ---------------------------------------------------------------------------
-// PATCH /api/v1/notifications/:id/read
-// Marks a notification as read for the authenticated user
-// Requirements: 7.4, 7.6
-// ---------------------------------------------------------------------------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// PATCH /api/v1/notifications/:id/read — marks a notification as read
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
-  const userId = request.headers.get("X-User-ID");
-  if (!userId) {
-    return Errors.unauthorized("Se requiere autenticación para marcar notificaciones");
-  }
-
-  const communityId = request.headers.get("X-Community-ID");
-  if (!communityId) {
-    return Errors.validation("El header X-Community-ID es requerido", "communityId");
-  }
+  const { context, error } = await requireSessionContext(request);
+  if (error || !context) return error ?? Errors.unauthorized();
+  const { userId, communityId } = context;
 
   const { id } = params;
-
-  // Validate UUID format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(id)) {
-    return Errors.validation("ID de notificación inválido", "id");
-  }
+  if (!UUID_RE.test(id)) return Errors.validation("ID de notificación inválido", "id");
 
   try {
-    // Verify notification exists and belongs to this user/community
     const existing = await prisma.notification.findFirst({
       where: { id, userId, communityId },
     });
-
-    if (!existing) {
-      return Errors.notFound("Notificación no encontrada");
-    }
+    if (!existing) return Errors.notFound("Notificación no encontrada");
 
     const notification = await prisma.notification.update({
       where: { id },
       data: { read: true },
-      select: {
-        id: true,
-        type: true,
-        payload: true,
-        read: true,
-        createdAt: true,
-        expiresAt: true,
-      },
+      select: { id: true, type: true, payload: true, read: true, createdAt: true, expiresAt: true },
     });
 
     return NextResponse.json({ data: { notification } }, { status: 200 });
   } catch (err) {
     console.error("[PATCH /notifications/:id/read] DB error:", err);
+    return Errors.internal();
+  }
+}
+
+// PATCH /api/v1/notifications/all/read — marks all as read
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  const { context, error } = await requireSessionContext(request);
+  if (error || !context) return error ?? Errors.unauthorized();
+  const { userId, communityId } = context;
+
+  try {
+    await prisma.notification.updateMany({
+      where: { userId, communityId, read: false },
+      data: { read: true },
+    });
+    return NextResponse.json({ data: { ok: true } }, { status: 200 });
+  } catch (err) {
+    console.error("[PUT /notifications/all/read] DB error:", err);
     return Errors.internal();
   }
 }

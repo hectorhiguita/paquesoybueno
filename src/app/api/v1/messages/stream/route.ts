@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Errors } from "@/lib/api/errors";
+import { prisma } from "@/lib/prisma";
+import { requireSessionContext } from "@/lib/auth/session";
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/messages/stream
@@ -8,40 +10,72 @@ import { Errors } from "@/lib/api/errors";
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const communityId = request.headers.get("X-Community-ID");
-  if (!communityId) {
-    return Errors.validation("El header X-Community-ID es requerido", "communityId");
-  }
-
-  const userId = request.headers.get("X-User-ID");
-  if (!userId) {
-    return Errors.unauthorized("Se requiere autenticación");
-  }
+  const { context, error } = await requireSessionContext(request);
+  if (error || !context) return error ?? Errors.unauthorized("Se requiere autenticación");
+  const { userId, communityId } = context;
 
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
-    start(controller) {
-      // Send initial connection event
-      controller.enqueue(
-        encoder.encode(`event: connected\ndata: ${JSON.stringify({ userId, communityId })}\n\n`)
-      );
+    async start(controller) {
+      let closed = false;
+      let lastMessageAt = new Date(0).toISOString();
 
-      // Send heartbeat every 30 seconds to keep connection alive
-      const heartbeatInterval = setInterval(() => {
+      const send = (event: string, payload: unknown) => {
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`)
+        );
+      };
+
+      // Send initial connection event
+      send("connected", { userId, communityId });
+
+      const checkUpdates = async () => {
+        if (closed) return;
         try {
-          controller.enqueue(
-            encoder.encode(`event: heartbeat\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`)
-          );
+          const latest = await prisma.message.findFirst({
+            where: {
+              communityId,
+              thread: {
+                OR: [{ participantA: userId }, { participantB: userId }],
+              },
+            },
+            orderBy: { sentAt: "desc" },
+            select: { id: true, threadId: true, sentAt: true, senderId: true },
+          });
+
+          if (latest && latest.sentAt.toISOString() > lastMessageAt) {
+            lastMessageAt = latest.sentAt.toISOString();
+            send("thread-update", {
+              messageId: latest.id,
+              threadId: latest.threadId,
+              sentAt: lastMessageAt,
+              senderId: latest.senderId,
+            });
+          }
         } catch {
-          clearInterval(heartbeatInterval);
+          send("heartbeat", { ts: Date.now() });
         }
+      };
+
+      await checkUpdates();
+
+      const heartbeatInterval = setInterval(() => {
+        if (closed) return;
+        send("heartbeat", { ts: Date.now() });
       }, 30_000);
 
-      // Clean up on close
+      const pollInterval = setInterval(() => {
+        void checkUpdates();
+      }, 5000);
+
       request.signal.addEventListener("abort", () => {
+        closed = true;
         clearInterval(heartbeatInterval);
-        controller.close();
+        clearInterval(pollInterval);
+        try {
+          controller.close();
+        } catch {}
       });
     },
   });

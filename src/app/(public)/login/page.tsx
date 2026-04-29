@@ -1,10 +1,51 @@
 "use client";
 
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
+
+type Status = "idle" | "submitting" | "error";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [form, setForm] = useState({ email: "", password: "" });
+
+  const set = (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.email || !form.password) return;
+    setStatus("submitting");
+    setErrorMsg("");
+
+    const result = await signIn("credentials", {
+      email: form.email,
+      password: form.password,
+      communityId: SANTA_ELENA_COMMUNITY_ID,
+      redirect: false,
+    });
+
+    if (result?.ok) {
+      router.push("/dashboard");
+      router.refresh();
+    } else {
+      setErrorMsg(
+        result?.error === "CredentialsSignin"
+          ? "Correo o contraseña incorrectos. Verifica tus datos."
+          : "Error al iniciar sesión. Intenta de nuevo."
+      );
+      setStatus("error");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
@@ -15,31 +56,59 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex flex-col gap-4">
-            <Input label="Correo electrónico" type="email" placeholder="correo@ejemplo.com" />
-            <Input label="Contraseña" type="password" placeholder="Tu contraseña" />
-            <div className="text-right">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
+              label="Correo electrónico"
+              type="email"
+              placeholder="correo@ejemplo.com"
+              value={form.email}
+              onChange={set("email")}
+              required
+            />
+            <Input
+              label="Contraseña"
+              type="password"
+              placeholder="Tu contraseña"
+              value={form.password}
+              onChange={set("password")}
+              required
+            />
+
+            {status === "error" && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                {errorMsg}
+              </p>
+            )}
+
+            <div className="text-right -mt-1">
               <Link href="/forgot-password" className="text-sm text-green-700 hover:underline">
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
-            <Button className="w-full mt-2">Ingresar</Button>
-          </div>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center text-xs text-gray-400 bg-white px-2">
-              o continúa con
-            </div>
-          </div>
+            <Button type="submit" className="w-full mt-2" disabled={status === "submitting"}>
+              {status === "submitting" ? "Ingresando..." : "Ingresar"}
+            </Button>
+          </form>
 
           {process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true" && (
-            <button className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px]">
-              <span className="text-lg">G</span>
-              Ingresar con Google
-            </button>
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-xs text-gray-400 bg-white px-2">
+                  o continúa con
+                </div>
+              </div>
+              <button
+                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+                className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px]"
+              >
+                <span className="text-lg">G</span>
+                Ingresar con Google
+              </button>
+            </>
           )}
         </div>
 

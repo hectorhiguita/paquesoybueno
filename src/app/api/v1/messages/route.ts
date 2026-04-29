@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
+import { requireSessionContext } from "@/lib/auth/session";
+import type { MessageThreadListItem } from "@/types/prisma";
 
-const createMessageSchema = z.object({
-  threadId: z.string().uuid("El threadId debe ser un UUID válido"),
+const sendMessageSchema = z.object({
+  threadId: z.string().uuid("El threadId debe ser un UUID válido").optional(),
+  participantId: z.string().uuid("El participantId debe ser un UUID válido").optional(),
+  listingId: z.string().uuid().optional(),
   content: z
     .string()
     .min(1, "El contenido no puede estar vacío")
@@ -12,21 +16,67 @@ const createMessageSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/v1/messages
-// Creates a new message in a thread
-// Requirements: 5.2, 5.3, 5.6
+// GET /api/v1/messages
+// List all message threads for the authenticated user
 // ---------------------------------------------------------------------------
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const { context, error } = await requireSessionContext(request);
+  if (error || !context) return error ?? Errors.unauthorized();
+  const { userId, communityId } = context;
 
+  try {
+    const threads = await prisma.messageThread.findMany({
+      where: {
+        communityId,
+        OR: [{ participantA: userId }, { participantB: userId }],
+      },
+      include: {
+        userA: { select: { id: true, name: true } },
+        userB: { select: { id: true, name: true } },
+        messages: {
+          orderBy: { sentAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            content: true,
+            sentAt: true,
+            senderId: true,
+            delivered: true,
+          },
+        },
+      },
+      orderBy: { lastMessageAt: "desc" },
+    });
+
+    const result = threads.map((t: MessageThreadListItem) => ({
+      id: t.id,
+      listingId: t.listingId,
+      other: t.userA.id === userId ? t.userB : t.userA,
+      lastMessage: t.messages[0] ?? null,
+      lastMessageAt: t.lastMessageAt,
+      hasUnread:
+        t.messages[0] !== undefined &&
+        t.messages[0].senderId !== userId &&
+        !t.messages[0].delivered,
+    }));
+
+    return NextResponse.json({ data: { threads: result } }, { status: 200 });
+  } catch (err) {
+    console.error("[GET /messages] DB error:", err);
+    return Errors.internal();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/messages
+// Send a message — creates a thread if participantId is given, uses existing if threadId is given
+// ---------------------------------------------------------------------------
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const senderId = request.headers.get("X-User-ID");
-  if (!senderId) {
-    return Errors.unauthorized("Se requiere autenticación para enviar mensajes");
+  const { context, error } = await requireSessionContext(request);
+  if (error || !context) {
+    return error ?? Errors.unauthorized("Se requiere autenticación para enviar mensajes");
   }
-
-  const communityId = request.headers.get("X-Community-ID");
-  if (!communityId) {
-    return Errors.validation("El header X-Community-ID es requerido", "communityId");
-  }
+  const { userId: senderId, communityId } = context;
 
   let body: unknown;
   try {
@@ -35,68 +85,90 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return Errors.validation("El cuerpo de la solicitud debe ser JSON válido");
   }
 
-  const parsed = createMessageSchema.safeParse(body);
+  const parsed = sendMessageSchema.safeParse(body);
   if (!parsed.success) {
-    const firstIssue = parsed.error.issues[0];
-    return Errors.validation(firstIssue.message, firstIssue.path[0] as string | undefined);
+    return Errors.validation(parsed.error.issues[0].message, parsed.error.issues[0].path[0] as string);
   }
 
-  const { threadId, content } = parsed.data;
+  const { threadId, participantId, listingId, content } = parsed.data;
+
+  if (!threadId && !participantId) {
+    return Errors.validation("Se requiere threadId o participantId");
+  }
 
   try {
-    // Check sender's account status (Req 5.6)
     const sender = await prisma.user.findFirst({
       where: { id: senderId, communityId },
       select: { status: true },
     });
 
-    if (!sender) {
-      return Errors.unauthorized("Usuario no encontrado");
+    if (!sender) return Errors.unauthorized("Usuario no encontrado");
+
+    if (sender.status === "locked" || sender.status === "under_review" || sender.status === "suspended") {
+      return Errors.forbidden("Tu cuenta está restringida y no puedes enviar mensajes");
     }
 
-    if (sender.status === "locked" || sender.status === "under_review") {
-      return Errors.forbidden(
-        "Tu cuenta está restringida y no puedes enviar mensajes"
-      );
+    let resolvedThreadId = threadId;
+
+    if (!resolvedThreadId && participantId) {
+      if (participantId === senderId) {
+        return Errors.validation("No puedes enviarte mensajes a ti mismo");
+      }
+
+      const existing = await prisma.messageThread.findFirst({
+        where: {
+          communityId,
+          OR: [
+            { participantA: senderId, participantB: participantId },
+            { participantA: participantId, participantB: senderId },
+          ],
+          ...(listingId ? { listingId } : {}),
+        },
+      });
+
+      if (existing) {
+        resolvedThreadId = existing.id;
+      } else {
+        const newThread = await prisma.messageThread.create({
+          data: {
+            communityId,
+            participantA: senderId,
+            participantB: participantId,
+            ...(listingId ? { listingId } : {}),
+          },
+        });
+        resolvedThreadId = newThread.id;
+      }
     }
 
-    // Verify thread exists and sender is a participant
     const thread = await prisma.messageThread.findFirst({
       where: {
-        id: threadId,
+        id: resolvedThreadId,
         communityId,
         OR: [{ participantA: senderId }, { participantB: senderId }],
       },
     });
 
-    if (!thread) {
-      return Errors.forbidden("No tienes acceso a este hilo de mensajes");
-    }
+    if (!thread) return Errors.forbidden("No tienes acceso a este hilo de mensajes");
 
     const message = await prisma.message.create({
-      data: {
-        communityId,
-        threadId,
-        senderId,
-        content,
-        delivered: false,
-      },
+      data: { communityId, threadId: resolvedThreadId!, senderId, content, delivered: false },
       select: {
         id: true,
         content: true,
         sentAt: true,
         delivered: true,
+        threadId: true,
         sender: { select: { id: true, name: true } },
       },
     });
 
-    // Update thread's lastMessageAt
     await prisma.messageThread.update({
-      where: { id: threadId },
+      where: { id: resolvedThreadId },
       data: { lastMessageAt: new Date() },
     });
 
-    return NextResponse.json({ data: { message } }, { status: 201 });
+    return NextResponse.json({ data: { message, threadId: resolvedThreadId } }, { status: 201 });
   } catch (err) {
     console.error("[POST /messages] DB error:", err);
     return Errors.internal();

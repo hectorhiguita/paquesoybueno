@@ -1,39 +1,88 @@
 import Link from "next/link";
-import { MARKET_ITEMS } from "@/lib/mock-data";
 import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
-export default function MarketItemPage({ params }: { params: { id: string } }) {
-  const item = MARKET_ITEMS.find((i) => i.id === params.id);
+export default async function MarketItemPage({ params }: { params: { id: string } }) {
+  const item = await prisma.listing.findFirst({
+    where: {
+      id: params.id,
+      communityId: SANTA_ELENA_COMMUNITY_ID,
+      type: { in: ["sale", "trade"] },
+      status: "active",
+    },
+    include: {
+      author: { select: { id: true, name: true, phone: true, isVerifiedProvider: true } },
+      vereda: { select: { name: true } },
+      category: { select: { name: true } },
+      ratings: { select: { stars: true } },
+    },
+  });
+
   if (!item) notFound();
 
-  const related = MARKET_ITEMS.filter((i) => i.type === item.type && i.id !== item.id).slice(0, 3);
+  const related = await prisma.listing.findMany({
+    where: {
+      communityId: SANTA_ELENA_COMMUNITY_ID,
+      type: item.type,
+      status: "active",
+      id: { not: item.id },
+    },
+    include: {
+      vereda: { select: { name: true } },
+    },
+    take: 3,
+    orderBy: { createdAt: "desc" },
+  });
+
+  const sellerAvg =
+    item.ratings.length > 0
+      ? Math.round(
+          (item.ratings.reduce((s, r) => s + r.stars, 0) / item.ratings.length) * 10
+        ) / 10
+      : null;
+
+  const waText = encodeURIComponent(
+    `Hola, vi tu anuncio de "${item.title}" en Santa Elena y me interesa.`
+  );
+
+  const typeLabel = item.type === "sale" ? "🛒 Venta" : "🔄 Trueque";
+  const typeSlug = item.type;
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-3">
         <div className="max-w-3xl mx-auto">
-          <Link href={`/marketplace?type=${item.type}`} className="text-sm text-green-700 hover:underline">
+          <Link
+            href={`/marketplace?type=${typeSlug}`}
+            className="text-sm text-green-700 hover:underline"
+          >
             ← Volver al marketplace
           </Link>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
-        {/* Imagen / emoji */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-56 flex items-center justify-center text-8xl">
-            {item.emoji}
+          <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-56 flex items-center justify-center text-7xl">
+            {item.type === "sale" ? "🛒" : "🔄"}
           </div>
           <div className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">{item.title}</h1>
-                <p className="text-sm text-gray-500 mt-1">📍 {item.vereda} · Publicado {item.date}</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  📍 {item.vereda.name} · Publicado{" "}
+                  {item.createdAt.toLocaleDateString("es-CO", {
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </p>
               </div>
-              {item.price ? (
+              {item.priceCop !== null ? (
                 <div className="text-right flex-shrink-0">
                   <p className="text-2xl font-bold text-green-700">
-                    ${item.price.toLocaleString("es-CO")}
+                    ${Number(item.priceCop).toLocaleString("es-CO")}
                   </p>
                   <p className="text-xs text-gray-400">COP</p>
                 </div>
@@ -45,52 +94,53 @@ export default function MarketItemPage({ params }: { params: { id: string } }) {
             </div>
 
             <div className="flex items-center gap-2 mt-3">
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                item.condition === "Como nuevo"
-                  ? "bg-green-100 text-green-700"
-                  : item.condition === "Buen estado"
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}>
-                {item.condition}
+              <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-600">
+                {item.category.name}
               </span>
-              <span className="text-xs text-gray-400">
-                {item.type === "sale" ? "🛒 Venta" : "🔄 Trueque"}
-              </span>
+              <span className="text-xs text-gray-400">{typeLabel}</span>
             </div>
 
             <p className="text-gray-600 text-sm mt-4 leading-relaxed">{item.description}</p>
 
-            {item.tradeFor && (
+            {item.tradeDescription && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
                 <p className="text-sm font-semibold text-amber-800">Busca a cambio:</p>
-                <p className="text-sm text-amber-700 mt-0.5">{item.tradeFor}</p>
+                <p className="text-sm text-amber-700 mt-0.5">{item.tradeDescription}</p>
               </div>
             )}
 
             {/* Vendedor */}
             <div className="flex items-center gap-3 mt-5 p-4 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-xl">
-                👤
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700">
+                {item.author.name[0].toUpperCase()}
               </div>
               <div>
-                <p className="font-semibold text-sm text-gray-800">{item.seller}</p>
-                <p className="text-xs text-gray-500">⭐ {item.sellerRating} · Miembro verificado</p>
+                <p className="font-semibold text-sm text-gray-800">
+                  {item.author.name}
+                  {item.author.isVerifiedProvider && (
+                    <span className="ml-1 text-green-600 text-xs font-bold">✓ Verificado</span>
+                  )}
+                </p>
+                {sellerAvg !== null && (
+                  <p className="text-xs text-gray-500">⭐ {sellerAvg} calificación promedio</p>
+                )}
               </div>
             </div>
 
             {/* Acciones */}
             <div className="flex gap-3 mt-5">
-              <a
-                href={`https://wa.me/?text=Hola%2C%20vi%20tu%20anuncio%20de%20${encodeURIComponent(item.title)}%20en%20Santa%20Elena%20Platform`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 bg-green-500 text-white font-semibold text-sm py-3 rounded-xl hover:bg-green-600 transition-colors min-h-[44px] flex items-center justify-center gap-2"
-              >
-                💬 WhatsApp
-              </a>
+              {item.author.phone && (
+                <a
+                  href={`https://wa.me/57${item.author.phone}?text=${waText}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-green-500 text-white font-semibold text-sm py-3 rounded-xl hover:bg-green-600 transition-colors min-h-[44px] flex items-center justify-center gap-2"
+                >
+                  💬 WhatsApp
+                </a>
+              )}
               <Link
-                href="/register"
+                href={`/messages?participantId=${item.author.id}&listingId=${item.id}`}
                 className="flex-1 bg-green-700 text-white font-semibold text-sm py-3 rounded-xl hover:bg-green-800 transition-colors min-h-[44px] flex items-center justify-center gap-2"
               >
                 ✉️ Mensaje
@@ -113,18 +163,20 @@ export default function MarketItemPage({ params }: { params: { id: string } }) {
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
-                    {r.emoji}
+                    {r.type === "sale" ? "🛒" : "🔄"}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-gray-800 truncate">{r.title}</p>
-                    <p className="text-xs text-gray-500">📍 {r.vereda}</p>
+                    <p className="text-xs text-gray-500">📍 {r.vereda.name}</p>
                   </div>
-                  {r.price ? (
+                  {r.priceCop !== null ? (
                     <p className="text-sm font-bold text-green-700 flex-shrink-0">
-                      ${r.price.toLocaleString("es-CO")}
+                      ${Number(r.priceCop).toLocaleString("es-CO")}
                     </p>
                   ) : (
-                    <span className="text-xs text-amber-600 font-semibold flex-shrink-0">Trueque</span>
+                    <span className="text-xs text-amber-600 font-semibold flex-shrink-0">
+                      Trueque
+                    </span>
                   )}
                 </Link>
               ))}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
+import { requireSessionContext } from "@/lib/auth/session";
 import { createListingSchema, listingFiltersSchema } from "@/lib/validations/listing";
 
 // Patterns for auto-flagging (Req 9.4)
@@ -139,16 +140,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Auth: extract user from session or X-User-ID header (stub for testing)
-  const authorId = request.headers.get("X-User-ID");
-  if (!authorId) {
+  const { context, error } = await requireSessionContext(request);
+  if (error || !context) {
     return Errors.unauthorized("Se requiere autenticación para crear un listing");
   }
+  const authorId = context.userId;
 
-  const communityId = request.headers.get("X-Community-ID");
-  if (!communityId) {
-    return Errors.validation("El header X-Community-ID es requerido", "communityId");
-  }
+  const communityId = context.communityId;
 
   // Parse body
   let body: unknown;
