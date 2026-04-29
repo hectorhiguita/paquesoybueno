@@ -63,6 +63,31 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   tags = { Name = "santa-elena-secretsmanager-endpoint-${var.environment}" }
 }
 
+# SSM Parameter Store — necesario para que ECS pueda resolver secrets desde
+# task definition usando parámetros /santa-elena/<env>/*
+resource "aws_vpc_endpoint" "ssm" {
+  vpc_id              = data.aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ssm"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = { Name = "santa-elena-ssm-endpoint-${var.environment}" }
+}
+
+# KMS — requerido para desencriptar SecureString de SSM sin salida a internet/NAT
+resource "aws_vpc_endpoint" "kms" {
+  vpc_id              = data.aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.kms"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = { Name = "santa-elena-kms-endpoint-${var.environment}" }
+}
+
 # ECR API — necesario para pull de imágenes Docker
 resource "aws_vpc_endpoint" "ecr_api" {
   vpc_id              = data.aws_vpc.main.id
