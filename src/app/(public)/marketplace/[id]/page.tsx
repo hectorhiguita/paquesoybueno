@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export default async function MarketItemPage({ params }: { params: { id: string } }) {
   const item = await prisma.listing.findFirst({
     where: {

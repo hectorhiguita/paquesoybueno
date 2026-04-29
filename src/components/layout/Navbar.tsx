@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { auth } from "@/lib/auth/config";
+import { useEffect, useState } from "react";
 
 const PUBLIC_LINKS = [
   { href: "/services", label: "Servicios" },
@@ -7,15 +9,37 @@ const PUBLIC_LINKS = [
   { href: "/tools", label: "Herramientas" },
 ];
 
-export async function Navbar() {
-  let session = null;
+interface SessionResponse {
+  user?: { id?: string | null; name?: string | null } | null;
+}
 
-  try {
-    session = await auth();
-  } catch (error) {
-    // No dejes que un fallo de auth/sesion derribe toda la navegacion publica.
-    console.error("[Navbar] Failed to resolve session:", error);
-  }
+export function Navbar() {
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSession = async () => {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as SessionResponse;
+        if (!cancelled) {
+          setHasSession(Boolean(data?.user?.id));
+        }
+      } catch {
+        if (!cancelled) {
+          setHasSession(false);
+        }
+      }
+    };
+
+    void loadSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <nav className="w-full bg-green-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
@@ -34,7 +58,7 @@ export async function Navbar() {
       </ul>
 
       <div className="flex items-center gap-3">
-        {session ? (
+        {hasSession ? (
           <>
             <Link
               href="/dashboard"

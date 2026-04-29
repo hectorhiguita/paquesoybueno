@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { NewListingForm } from "./NewListingForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewListingPage({
   searchParams,
 }: {

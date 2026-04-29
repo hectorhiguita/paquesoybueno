@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+export const dynamic = "force-dynamic";
+
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ApiSuccess } from "@/types/api";
 
@@ -26,7 +28,7 @@ type ThreadsResponse = ApiSuccess<{ threads: Thread[] }>;
 type MessagesResponse = ApiSuccess<{ messages: Message[] }>;
 type SendMessageResponse = ApiSuccess<{ message: Message; threadId: string }>;
 
-export default function MessagesPage() {
+function MessagesPageInner() {
   const searchParams = useSearchParams();
   const initialThread = searchParams.get("thread");
   const initialParticipant = searchParams.get("participantId");
@@ -300,5 +302,19 @@ export default function MessagesPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <p className="text-gray-400">Cargando mensajes...</p>
+        </main>
+      }
+    >
+      <MessagesPageInner />
+    </Suspense>
   );
 }

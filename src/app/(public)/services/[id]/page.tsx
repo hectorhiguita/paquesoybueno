@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export default async function ServiceDetailPage({ params }: { params: { id: string } }) {
   const listing = await prisma.listing.findFirst({
     where: { id: params.id, communityId: SANTA_ELENA_COMMUNITY_ID, type: "service" },

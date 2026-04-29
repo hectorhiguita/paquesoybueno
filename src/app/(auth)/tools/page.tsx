@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth/config";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 const conditionColor: Record<string, string> = {
   Bueno: "bg-green-100 text-green-700",
   Regular: "bg-yellow-100 text-yellow-700",
