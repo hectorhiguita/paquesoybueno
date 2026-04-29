@@ -8,7 +8,14 @@ const PUBLIC_LINKS = [
 ];
 
 export async function Navbar() {
-  const session = await auth();
+  let session = null;
+
+  try {
+    session = await auth();
+  } catch (error) {
+    // No dejes que un fallo de auth/sesion derribe toda la navegacion publica.
+    console.error("[Navbar] Failed to resolve session:", error);
+  }
 
   return (
     <nav className="w-full bg-green-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
