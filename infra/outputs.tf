@@ -38,8 +38,7 @@ output "ecs_app_service_name" {
   value       = module.ecs.app_service_name
 }
 
-output "secrets_arn" {
-  description = "ARN del secret en AWS Secrets Manager"
-  value       = module.secrets.secret_arn
-  sensitive   = true
+output "ssm_prefix" {
+  description = "Prefijo de los parámetros en SSM Parameter Store"
+  value       = "/santa-elena/${var.environment}"
 }

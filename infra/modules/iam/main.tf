@@ -8,7 +8,7 @@ data "aws_iam_policy_document" "ecs_assume_role" {
   }
 }
 
-# ─── ECS Task Execution Role (para pull de ECR y logs) ────────────────────────
+# ─── ECS Task Execution Role (pull de ECR, logs y lectura de SSM al arrancar) ─
 
 resource "aws_iam_role" "ecs_exec" {
   name               = "santa-elena-ecs-exec-${var.environment}"
@@ -20,18 +20,32 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Permiso para leer secrets de Secrets Manager
-resource "aws_iam_role_policy" "ecs_exec_secrets" {
-  name = "read-secrets"
+# El ECS agent usa la execution role para inyectar los valores de SSM
+# en las variables de entorno del contenedor antes de que arranque.
+resource "aws_iam_role_policy" "ecs_exec_ssm" {
+  name = "read-ssm-parameters"
   role = aws_iam_role.ecs_exec.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue", "kms:Decrypt"]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Sid    = "SSMGetParameters"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "arn:aws:ssm:*:*:parameter/santa-elena/*"
+      },
+      {
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+      }
+    ]
   })
 }
 
@@ -79,20 +93,6 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
   })
 }
 
-resource "aws_iam_role_policy" "ecs_task_secrets" {
-  name = "read-secrets"
-  role = aws_iam_role.ecs_task.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = "*"
-    }]
-  })
-}
-
 resource "aws_iam_role_policy" "ecs_task_logs" {
   name = "cloudwatch-logs"
   role = aws_iam_role.ecs_task.id
@@ -129,9 +129,9 @@ resource "aws_iam_user_policy" "github_actions" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "ECRAuth"
-        Effect = "Allow"
-        Action = ["ecr:GetAuthorizationToken"]
+        Sid      = "ECRAuth"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
         Resource = "*"
       },
       {
@@ -162,9 +162,9 @@ resource "aws_iam_user_policy" "github_actions" {
         Resource = "*"
       },
       {
-        Sid    = "TerraformState"
-        Effect = "Allow"
-        Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+        Sid      = "TerraformState"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
         Resource = "*"
       },
       {
@@ -172,15 +172,32 @@ resource "aws_iam_user_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "ec2:*", "ecs:*", "ecr:*", "elasticloadbalancing:*",
-          "iam:*", "logs:*", "secretsmanager:*", "s3:*",
-          "elasticfilesystem:*", "application-autoscaling:*"
+          "iam:*", "logs:*", "s3:*",
+          "elasticfilesystem:*", "application-autoscaling:*",
+          "acm:*", "route53:*", "rds:*", "ses:*"
         ]
         Resource = "*"
       },
       {
-        Sid    = "PassRole"
+        Sid    = "SSMReadForTerraform"
         Effect = "Allow"
-        Action = "iam:PassRole"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "arn:aws:ssm:*:*:parameter/santa-elena/*"
+      },
+      {
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+      },
+      {
+        Sid      = "PassRole"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
         Resource = "*"
       }
     ]

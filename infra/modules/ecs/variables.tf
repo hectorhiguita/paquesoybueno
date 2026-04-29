@@ -38,17 +38,8 @@ variable "ecs_exec_role_arn" {
   type = string
 }
 
-variable "secrets_arn" {
-  type = string
-}
-
 variable "log_group_app" {
   type = string
-}
-
-variable "postgres_password" {
-  type      = string
-  sensitive = true
 }
 
 variable "ecs_cluster_name" {

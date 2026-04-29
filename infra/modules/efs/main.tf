@@ -35,7 +35,7 @@ resource "aws_security_group" "efs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags  = { Name = "santa-elena-efs-sg-${var.environment}" }
+  tags = { Name = "santa-elena-efs-sg-${var.environment}" }
 
   lifecycle {
     ignore_changes = [description]
@@ -55,7 +55,7 @@ resource "aws_efs_access_point" "postgres_data" {
   file_system_id = aws_efs_file_system.postgres.id
 
   posix_user {
-    uid = 999  # UID del usuario postgres en el contenedor oficial
+    uid = 999 # UID del usuario postgres en el contenedor oficial
     gid = 999
   }
 

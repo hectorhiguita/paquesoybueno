@@ -65,7 +65,7 @@ variable "aws_region" {
   type = string
 }
 
-variable "database_url" {
+variable "admin_password_hash" {
   type      = string
   sensitive = true
   default   = ""
