@@ -184,8 +184,10 @@ resource "aws_ecs_task_definition" "migrate" {
       cpu       = 512
       memory    = 512
 
+      # entryPoint sobreescribe el ENTRYPOINT del Dockerfile (docker-entrypoint.sh)
+      # para que command llegue directamente a node sin pasar por el script.
+      entryPoint = ["node"]
       command = [
-        "node",
         "./node_modules/prisma/build/index.js",
         "migrate",
         "deploy"
@@ -231,7 +233,7 @@ resource "aws_ecs_task_definition" "app" {
       name      = "app"
       image     = "${var.ecr_repo_url}:latest"
       essential = true
-      cpu       = 2048
+      cpu       = 1024
       # t3.small tiene 2 GB — reservamos ~256 MB para el agente ECS + OS
       memory    = 1792
 
