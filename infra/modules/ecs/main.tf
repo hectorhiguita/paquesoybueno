@@ -182,7 +182,7 @@ resource "aws_ecs_task_definition" "migrate" {
       image     = "${var.ecr_repo_url}:latest"
       essential = true
       cpu       = 512
-      memory    = 400
+      memory    = 512
 
       command = [
         "node",
@@ -231,9 +231,9 @@ resource "aws_ecs_task_definition" "app" {
       name      = "app"
       image     = "${var.ecr_repo_url}:latest"
       essential = true
-      cpu       = 1024
-      # t3.micro tiene 1 GB — reservamos ~124 MB para el agente ECS + OS
-      memory    = 900
+      cpu       = 2048
+      # t3.small tiene 2 GB — reservamos ~256 MB para el agente ECS + OS
+      memory    = 1792
 
       portMappings = [{
         containerPort = 3000
