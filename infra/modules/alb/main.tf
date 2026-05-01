@@ -25,7 +25,7 @@ resource "aws_lb_target_group" "app" {
   # name_prefix permite que el TG nuevo exista junto al viejo durante el replace,
   # evitando el error "ResourceInUse" al cambiar target_type o cualquier otro
   # atributo que fuerza recreación. AWS limita el total a 32 chars.
-  name_prefix = "se-${var.environment}-"
+  name_prefix = "se-"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
