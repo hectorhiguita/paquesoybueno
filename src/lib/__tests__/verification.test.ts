@@ -1,13 +1,29 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    verificationCode: {
+      upsert: vi.fn(),
+      findUnique: vi.fn(),
+      delete: vi.fn(),
+    },
+  },
+}));
+
 import {
   generateVerificationCode,
   storeVerificationCode,
   verifyCode,
   hasPendingCode,
 } from "../verification";
+import { prisma } from "@/lib/prisma";
 
 const COMMUNITY = "550e8400-e29b-41d4-a716-446655440000";
 const PHONE = "3001234567";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("generateVerificationCode", () => {
   it("returns a 6-character string", () => {
@@ -22,48 +38,100 @@ describe("generateVerificationCode", () => {
 
   it("generates different codes on successive calls (probabilistic)", () => {
     const codes = new Set(Array.from({ length: 20 }, generateVerificationCode));
-    // With 1M possibilities, 20 calls should almost certainly produce >1 unique value
     expect(codes.size).toBeGreaterThan(1);
   });
 });
 
-describe("storeVerificationCode / verifyCode", () => {
-  it("accepts a correct code", () => {
-    storeVerificationCode(PHONE, COMMUNITY, "123456");
-    expect(verifyCode(PHONE, COMMUNITY, "123456")).toBe(true);
+describe("storeVerificationCode", () => {
+  it("calls prisma.verificationCode.upsert with correct data", async () => {
+    vi.mocked(prisma.verificationCode.upsert).mockResolvedValue({} as never);
+    await storeVerificationCode(PHONE, COMMUNITY, "123456");
+    expect(prisma.verificationCode.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { phone_communityId: { phone: PHONE, communityId: COMMUNITY } },
+        create: expect.objectContaining({ phone: PHONE, communityId: COMMUNITY, code: "123456" }),
+        update: expect.objectContaining({ code: "123456" }),
+      })
+    );
+  });
+});
+
+describe("verifyCode", () => {
+  it("returns true and deletes entry for a valid unexpired code", async () => {
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue({
+      phone: PHONE,
+      communityId: COMMUNITY,
+      code: "123456",
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+    } as never);
+    vi.mocked(prisma.verificationCode.delete).mockResolvedValue({} as never);
+
+    const result = await verifyCode(PHONE, COMMUNITY, "123456");
+    expect(result).toBe(true);
+    expect(prisma.verificationCode.delete).toHaveBeenCalled();
   });
 
-  it("rejects a wrong code", () => {
-    storeVerificationCode(PHONE, COMMUNITY, "123456");
-    expect(verifyCode(PHONE, COMMUNITY, "000000")).toBe(false);
+  it("returns false for a wrong code (does not delete)", async () => {
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue({
+      phone: PHONE,
+      communityId: COMMUNITY,
+      code: "123456",
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+    } as never);
+
+    const result = await verifyCode(PHONE, COMMUNITY, "000000");
+    expect(result).toBe(false);
+    expect(prisma.verificationCode.delete).not.toHaveBeenCalled();
   });
 
-  it("deletes the code after successful verification (one-time use)", () => {
-    storeVerificationCode(PHONE, COMMUNITY, "999999");
-    expect(verifyCode(PHONE, COMMUNITY, "999999")).toBe(true);
-    // Second attempt must fail
-    expect(verifyCode(PHONE, COMMUNITY, "999999")).toBe(false);
+  it("returns false when no code exists", async () => {
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue(null);
+    const result = await verifyCode("3009999999", COMMUNITY, "123456");
+    expect(result).toBe(false);
   });
 
-  it("returns false when no code has been stored", () => {
-    expect(verifyCode("3009999999", COMMUNITY, "123456")).toBe(false);
+  it("returns false and deletes expired code", async () => {
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue({
+      phone: PHONE,
+      communityId: COMMUNITY,
+      code: "123456",
+      expiresAt: new Date(Date.now() - 1),
+      createdAt: new Date(),
+    } as never);
+    vi.mocked(prisma.verificationCode.delete).mockResolvedValue({} as never);
+
+    const result = await verifyCode(PHONE, COMMUNITY, "123456");
+    expect(result).toBe(false);
+    expect(prisma.verificationCode.delete).toHaveBeenCalled();
   });
 
-  it("isolates codes by communityId", () => {
+  it("isolates codes by communityId", async () => {
     const otherCommunity = "660e8400-e29b-41d4-a716-446655440000";
-    storeVerificationCode(PHONE, COMMUNITY, "111111");
-    expect(verifyCode(PHONE, otherCommunity, "111111")).toBe(false);
-    expect(verifyCode(PHONE, COMMUNITY, "111111")).toBe(true);
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue(null);
+    const result = await verifyCode(PHONE, otherCommunity, "111111");
+    expect(result).toBe(false);
   });
 });
 
 describe("hasPendingCode", () => {
-  it("returns true when a valid code exists", () => {
-    storeVerificationCode("3007777777", COMMUNITY, "777777");
-    expect(hasPendingCode("3007777777", COMMUNITY)).toBe(true);
+  it("returns true when a valid code exists", async () => {
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue({
+      phone: PHONE,
+      communityId: COMMUNITY,
+      code: "777777",
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+    } as never);
+
+    const result = await hasPendingCode(PHONE, COMMUNITY);
+    expect(result).toBe(true);
   });
 
-  it("returns false when no code exists", () => {
-    expect(hasPendingCode("3008888888", COMMUNITY)).toBe(false);
+  it("returns false when no code exists", async () => {
+    vi.mocked(prisma.verificationCode.findUnique).mockResolvedValue(null);
+    const result = await hasPendingCode("3008888888", COMMUNITY);
+    expect(result).toBe(false);
   });
 });

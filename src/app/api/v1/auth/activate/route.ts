@@ -61,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const passwordHash = await hashPassword(password);
 
   const code = generateVerificationCode();
-  storeVerificationCode(user.phone, user.communityId, code);
+  await storeVerificationCode(user.phone, user.communityId, code);
   storePendingActivation(token, {
     userId: user.id,
     communityId: user.communityId,

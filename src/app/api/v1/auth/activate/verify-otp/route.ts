@@ -36,7 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return Errors.validation("La activación OTP expiró. Vuelve a abrir el enlace e intenta de nuevo.");
   }
 
-  const valid = verifyCode(pending.phone, pending.communityId, code);
+  const valid = await verifyCode(pending.phone, pending.communityId, code);
   if (!valid) {
     return NextResponse.json(
       {

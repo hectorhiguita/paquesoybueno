@@ -1,84 +1,56 @@
-/**
- * SMS sending utility.
- * Uses Twilio when TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER
- * env vars are present; otherwise logs to console (dev/test mode).
- */
+import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 
 export interface SmsSendResult {
   success: boolean;
-  sid?: string;
+  messageId?: string;
   error?: string;
 }
 
-/**
- * Sends a verification SMS to the given phone number.
- * @param phone - Colombian phone number (e.g. "3001234567" or "+573001234567")
- * @param code  - 6-digit verification code
- */
+const MESSAGE_BODY = (code: string) =>
+  `Tu código de verificación para Santa Elena es: ${code}. Válido por 10 minutos.`;
+
 export async function sendVerificationSms(
   phone: string,
   code: string
 ): Promise<SmsSendResult> {
-  // Normalize to E.164 format
   const normalized = normalizePhone(phone);
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromPhone = process.env.TWILIO_PHONE_NUMBER;
-
-  if (accountSid && authToken && fromPhone) {
-    return sendViaTwilio(normalized, code, accountSid, authToken, fromPhone);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[SMS DEV] To: ${normalized} | Code: ${code} | Message: ${MESSAGE_BODY(code)}`);
+    return { success: true };
   }
 
-  // Dev/test fallback — log to console
-  console.log(
-    `[SMS DEV] To: ${normalized} | Code: ${code} | Message: Tu código de verificación para Santa Elena Platform es: ${code}`
-  );
-  return { success: true };
+  return sendViaSns(normalized, code);
 }
 
 function normalizePhone(phone: string): string {
-  // Already E.164
   if (phone.startsWith("+")) return phone;
-  // Has country code without +
   if (phone.startsWith("57")) return `+${phone}`;
-  // 10-digit Colombian mobile
   return `+57${phone}`;
 }
 
-async function sendViaTwilio(
-  to: string,
-  code: string,
-  accountSid: string,
-  authToken: string,
-  from: string
-): Promise<SmsSendResult> {
-  try {
-    const body = `Tu código de verificación para Santa Elena Platform es: ${code}. Válido por 10 minutos.`;
-    const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+async function sendViaSns(to: string, code: string): Promise<SmsSendResult> {
+  const client = new SNSClient({ region: process.env.AWS_REGION ?? "us-east-1" });
 
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+  try {
+    const result = await client.send(
+      new PublishCommand({
+        PhoneNumber: to,
+        Message: MESSAGE_BODY(code),
+        MessageAttributes: {
+          "AWS.SNS.SMS.SMSType": {
+            DataType: "String",
+            StringValue: "Transactional",
+          },
+          "AWS.SNS.SMS.SenderID": {
+            DataType: "String",
+            StringValue: "SantaElena",
+          },
         },
-        body: new URLSearchParams({ To: to, From: from, Body: body }).toString(),
-      }
+      })
     );
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error: (err as { message?: string }).message ?? `Twilio error ${response.status}`,
-      };
-    }
-
-    const data = (await response.json()) as { sid: string };
-    return { success: true, sid: data.sid };
+    return { success: true, messageId: result.MessageId };
   } catch (err) {
     return {
       success: false,

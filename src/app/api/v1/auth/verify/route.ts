@@ -49,7 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // --- Verify code ---
-  const valid = verifyCode(phone, communityId, code);
+  const valid = await verifyCode(phone, communityId, code);
   if (!valid) {
     return NextResponse.json(
       {

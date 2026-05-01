@@ -122,6 +122,21 @@ resource "aws_iam_role_policy" "ecs_task_logs" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_task_sns" {
+  name = "sns-publish-sms"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "SNSPublishSMS"
+      Effect   = "Allow"
+      Action   = ["sns:Publish"]
+      Resource = "*"
+    }]
+  })
+}
+
 # ─── IAM User para GitHub Actions (CI/CD) ────────────────────────────────────
 
 resource "aws_iam_user" "github_actions" {
