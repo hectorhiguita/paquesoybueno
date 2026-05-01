@@ -1,59 +1,52 @@
-/**
- * Tokens de activación de cuenta de único uso.
- * Se generan al registrarse y expiran en 24 horas.
- * En producción usar Redis o tabla DB; aquí usamos Map en memoria.
- */
+import { prisma } from "@/lib/prisma";
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
-interface ActivationEntry {
-  userId: string;
-  email: string;
-  communityId: string;
-  expiresAt: number;
-  used: boolean;
-}
-
-const store = new Map<string, ActivationEntry>();
-
-export function generateActivationToken(
+export async function generateActivationToken(
   userId: string,
   email: string,
   communityId: string
-): string {
+): Promise<string> {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const token = Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  store.set(token, {
-    userId,
-    email,
-    communityId,
-    expiresAt: Date.now() + TOKEN_TTL_MS,
-    used: false,
+  await prisma.activationToken.create({
+    data: {
+      token,
+      userId,
+      email,
+      communityId,
+      expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+    },
   });
 
   return token;
 }
 
-export function validateActivationToken(
+export async function validateActivationToken(
   token: string
-): { userId: string; email: string; communityId: string } | null {
-  const entry = store.get(token);
+): Promise<{ userId: string; email: string; communityId: string } | null> {
+  const entry = await prisma.activationToken.findUnique({
+    where: { token },
+    select: { userId: true, email: true, communityId: true, expiresAt: true, used: true },
+  });
+
   if (!entry) return null;
   if (entry.used) return null;
-  if (Date.now() > entry.expiresAt) {
-    store.delete(token);
+  if (entry.expiresAt < new Date()) {
+    await prisma.activationToken.delete({ where: { token } }).catch(() => {});
     return null;
   }
+
   return { userId: entry.userId, email: entry.email, communityId: entry.communityId };
 }
 
-export function consumeActivationToken(token: string): boolean {
-  const entry = store.get(token);
-  if (!entry || entry.used || Date.now() > entry.expiresAt) return false;
-  entry.used = true;
-  store.set(token, entry);
-  return true;
+export async function consumeActivationToken(token: string): Promise<boolean> {
+  const updated = await prisma.activationToken.updateMany({
+    where: { token, used: false, expiresAt: { gt: new Date() } },
+    data: { used: true },
+  });
+  return updated.count > 0;
 }

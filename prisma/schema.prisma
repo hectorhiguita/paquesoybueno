@@ -77,9 +77,10 @@ model User {
   notifications   Notification[]
   reportsFilied   Report[]        @relation("ReporterReports")
   reservations    Reservation[]
-  veredaFollows   VeredaFollow[]
-  threadAsA       MessageThread[] @relation("ParticipantA")
-  threadAsB       MessageThread[] @relation("ParticipantB")
+  veredaFollows     VeredaFollow[]
+  threadAsA         MessageThread[]   @relation("ParticipantA")
+  threadAsB         MessageThread[]   @relation("ParticipantB")
+  activationTokens  ActivationToken[]
 
   @@unique([communityId, email])
   @@unique([communityId, phone])
@@ -292,6 +293,21 @@ model Reservation {
   requester   User      @relation(fields: [requesterId], references: [id])
 
   @@map("reservations")
+}
+
+model ActivationToken {
+  token       String   @id
+  userId      String   @map("user_id") @db.Uuid
+  email       String
+  communityId String   @map("community_id") @db.Uuid
+  expiresAt   DateTime @map("expires_at")
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("activation_tokens")
 }
 
 model VeredaFollow {

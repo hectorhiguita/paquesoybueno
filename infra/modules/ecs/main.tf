@@ -158,6 +158,61 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   }
 }
 
+# ─── Task Definition — Migraciones Prisma (CI/CD) ────────────────────────────
+# Se ejecuta una sola vez por despliegue desde el pipeline, antes de actualizar
+# el servicio principal. No corre en el arranque del contenedor de la app.
+#
+# Uso en CI/CD:
+#   aws ecs run-task \
+#     --cluster <cluster> \
+#     --task-definition santa-elena-migrate-<env> \
+#     --launch-type EC2 \
+#     --count 1
+
+resource "aws_ecs_task_definition" "migrate" {
+  family                   = "santa-elena-migrate-${var.environment}"
+  requires_compatibilities = ["EC2"]
+  network_mode             = "bridge"
+  execution_role_arn       = var.ecs_exec_role_arn
+  task_role_arn            = var.ecs_task_role_arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "migrate"
+      image     = "${var.ecr_repo_url}:latest"
+      essential = true
+      cpu       = 512
+      memory    = 400
+
+      command = [
+        "node",
+        "./node_modules/prisma/build/index.js",
+        "migrate",
+        "deploy"
+      ]
+
+      environment = [
+        { name = "NODE_ENV", value = "production" }
+      ]
+
+      secrets = [
+        { name = "DATABASE_URL", valueFrom = "${local.ssm_prefix}/DATABASE_URL" }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = var.log_group_app
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "migrate"
+        }
+      }
+    }
+  ])
+
+  tags = { Name = "santa-elena-migrate-${var.environment}" }
+}
+
 # ─── Task Definition — App Next.js ────────────────────────────────────────────
 
 locals {
@@ -219,10 +274,12 @@ resource "aws_ecs_task_definition" "app" {
 
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
-        interval    = 30
+        interval    = 20
         timeout     = 5
         retries     = 3
-        startPeriod = 90
+        # Las migraciones corren en CI/CD, no en el entrypoint.
+        # Next.js standalone arranca en ~20-30s en t3.small.
+        startPeriod = 60
       }
     }
   ])

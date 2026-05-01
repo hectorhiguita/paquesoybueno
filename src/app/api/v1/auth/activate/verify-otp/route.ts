@@ -26,7 +26,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { token, code } = parsed.data;
-  const entry = validateActivationToken(token);
+  const entry = await validateActivationToken(token);
   if (!entry) {
     return Errors.validation("El enlace de activación es inválido o ya fue utilizado", "token");
   }
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return Errors.internal();
   }
 
-  consumeActivationToken(token);
+  await consumeActivationToken(token);
   clearPendingActivation(token);
 
   return NextResponse.json(

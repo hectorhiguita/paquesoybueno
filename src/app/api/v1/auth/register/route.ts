@@ -121,7 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Generar token de activación de único uso (24h)
-  const token = generateActivationToken(userId, normalizedEmail, communityId);
+  const token = await generateActivationToken(userId, normalizedEmail, communityId);
   const baseUrl = process.env.NEXTAUTH_URL ?? "https://santaelenacomunidad.online";
   const activationUrl = `${baseUrl}/activate?token=${token}`;
 
