@@ -9,6 +9,9 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    activationToken: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   },
 }));
 

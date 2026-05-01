@@ -55,6 +55,9 @@ vi.mock("@/lib/prisma", () => ({
     },
     vereda: { findFirst: vi.fn() },
     category: { findFirst: vi.fn() },
+    activationToken: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   },
 }));
 

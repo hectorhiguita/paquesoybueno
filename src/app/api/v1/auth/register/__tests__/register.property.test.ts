@@ -12,12 +12,14 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    activationToken: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   },
 }));
 
-// Mock SMS to avoid real calls
-vi.mock("@/lib/sms", () => ({
-  sendVerificationSms: vi.fn().mockResolvedValue({ success: true }),
+vi.mock("@/lib/email", () => ({
+  sendActivationEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 import { POST } from "../route";
