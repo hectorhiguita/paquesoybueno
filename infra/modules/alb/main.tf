@@ -22,7 +22,10 @@ resource "aws_lb" "main" {
 # ─── Target Group para la app Next.js ────────────────────────────────────────
 
 resource "aws_lb_target_group" "app" {
-  name        = "santa-elena-app-${var.environment}"
+  # name_prefix permite que el TG nuevo exista junto al viejo durante el replace,
+  # evitando el error "ResourceInUse" al cambiar target_type o cualquier otro
+  # atributo que fuerza recreación. AWS limita el total a 32 chars.
+  name_prefix = "se-${var.environment}-"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -41,6 +44,10 @@ resource "aws_lb_target_group" "app" {
   }
 
   tags = { Name = "santa-elena-app-tg-${var.environment}" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ─── Listener HTTP → redirect a HTTPS ────────────────────────────────────────
