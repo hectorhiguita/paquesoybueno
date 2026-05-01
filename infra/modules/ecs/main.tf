@@ -4,11 +4,11 @@ data "aws_ecs_cluster" "main" {
   cluster_name = var.ecs_cluster_name
 }
 
-# ─── Security Group para las tasks ECS ───────────────────────────────────────
+# ─── Security Group para las instancias EC2 ───────────────────────────────────
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "santa-elena-ecs-tasks-${var.environment}"
-  description = "Allow traffic from ALB to ECS tasks"
+  description = "Allow traffic from ALB to ECS EC2 instances"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -34,21 +34,140 @@ resource "aws_security_group" "ecs_tasks" {
   }
 }
 
+# ─── IAM — rol de instancia EC2 para el agente ECS ───────────────────────────
+
+resource "aws_iam_role" "ec2_instance" {
+  name = "santa-elena-ecs-instance-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_instance_ecs" {
+  role       = aws_iam_role.ec2_instance.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+}
+
+resource "aws_iam_instance_profile" "ec2_instance" {
+  name = "santa-elena-ecs-instance-${var.environment}"
+  role = aws_iam_role.ec2_instance.name
+}
+
+# ─── AMI ECS-optimized (Amazon Linux 2, siempre la última) ────────────────────
+
+data "aws_ssm_parameter" "ecs_ami" {
+  name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id"
+}
+
+# ─── Launch Template ──────────────────────────────────────────────────────────
+
+resource "aws_launch_template" "ecs" {
+  name_prefix   = "santa-elena-ecs-${var.environment}-"
+  image_id      = data.aws_ssm_parameter.ecs_ami.value
+  instance_type = var.ec2_instance_type
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_instance.name
+  }
+
+  vpc_security_group_ids = [aws_security_group.ecs_tasks.id]
+
+  # Registra la instancia en el cluster al arrancar
+  user_data = base64encode(<<-EOT
+    #!/bin/bash
+    echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config
+    echo ECS_ENABLE_CONTAINER_METADATA=true >> /etc/ecs/ecs.config
+  EOT
+  )
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = { Name = "santa-elena-ecs-${var.environment}" }
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ─── Auto Scaling Group — 1 nodo base, hasta 3 ────────────────────────────────
+
+resource "aws_autoscaling_group" "ecs" {
+  name                = "santa-elena-ecs-${var.environment}"
+  min_size            = 1
+  desired_capacity    = 1
+  max_size            = 3
+  vpc_zone_identifier = var.private_subnet_ids
+
+  launch_template {
+    id      = aws_launch_template.ecs.id
+    version = "$Latest"
+  }
+
+  # Evita que el Capacity Provider termine instancias con tareas activas
+  protect_from_scale_in = true
+
+  tag {
+    key                 = "AmazonECSManaged"
+    value               = "true"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "santa-elena-ecs-${var.environment}"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    ignore_changes = [desired_capacity]
+  }
+}
+
+# ─── ECS Capacity Provider ────────────────────────────────────────────────────
+
+resource "aws_ecs_capacity_provider" "ec2" {
+  name = "santa-elena-ec2-${var.environment}"
+
+  auto_scaling_group_provider {
+    auto_scaling_group_arn         = aws_autoscaling_group.ecs.arn
+    managed_termination_protection = "ENABLED"
+
+    managed_scaling {
+      status                    = "ENABLED"
+      target_capacity           = 80
+      minimum_scaling_step_size = 1
+      maximum_scaling_step_size = 3
+    }
+  }
+}
+
+resource "aws_ecs_cluster_capacity_providers" "main" {
+  cluster_name       = var.ecs_cluster_name
+  capacity_providers = [aws_ecs_capacity_provider.ec2.name]
+
+  default_capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+  }
+}
+
 # ─── Task Definition — App Next.js ────────────────────────────────────────────
-# Los secretos se inyectan desde SSM Parameter Store.
-# El ECS agent los resuelve en tiempo de arranque usando la execution role.
 
 locals {
-  # Prefijo base de los ARNs de SSM — cada parámetro es su propio recurso.
   ssm_prefix = "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter/santa-elena/${var.environment}"
 }
 
 resource "aws_ecs_task_definition" "app" {
   family                   = "santa-elena-app-${var.environment}"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = "1024"
-  memory                   = "2048"
+  requires_compatibilities = ["EC2"]
+  network_mode             = "bridge"
   execution_role_arn       = var.ecs_exec_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -57,9 +176,13 @@ resource "aws_ecs_task_definition" "app" {
       name      = "app"
       image     = "${var.ecr_repo_url}:latest"
       essential = true
+      cpu       = 1024
+      # t3.micro tiene 1 GB — reservamos ~124 MB para el agente ECS + OS
+      memory    = 900
 
       portMappings = [{
         containerPort = 3000
+        hostPort      = 3000
         protocol      = "tcp"
       }]
 
@@ -68,24 +191,21 @@ resource "aws_ecs_task_definition" "app" {
         { name = "PORT", value = "3000" }
       ]
 
-      # Cada entrada apunta al ARN del parámetro SSM correspondiente.
-      # El nombre del parámetro SSM sigue la convención:
-      #   /santa-elena/<environment>/<NOMBRE>
       secrets = [
-        { name = "NEXTAUTH_SECRET", valueFrom = "${local.ssm_prefix}/NEXTAUTH_SECRET" },
-        { name = "NEXTAUTH_URL", valueFrom = "${local.ssm_prefix}/NEXTAUTH_URL" },
-        { name = "DATABASE_URL", valueFrom = "${local.ssm_prefix}/DATABASE_URL" },
-        { name = "GOOGLE_CLIENT_ID", valueFrom = "${local.ssm_prefix}/GOOGLE_CLIENT_ID" },
+        { name = "NEXTAUTH_SECRET",      valueFrom = "${local.ssm_prefix}/NEXTAUTH_SECRET" },
+        { name = "NEXTAUTH_URL",         valueFrom = "${local.ssm_prefix}/NEXTAUTH_URL" },
+        { name = "DATABASE_URL",         valueFrom = "${local.ssm_prefix}/DATABASE_URL" },
+        { name = "GOOGLE_CLIENT_ID",     valueFrom = "${local.ssm_prefix}/GOOGLE_CLIENT_ID" },
         { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${local.ssm_prefix}/GOOGLE_CLIENT_SECRET" },
-        { name = "TWILIO_ACCOUNT_SID", valueFrom = "${local.ssm_prefix}/TWILIO_ACCOUNT_SID" },
-        { name = "TWILIO_AUTH_TOKEN", valueFrom = "${local.ssm_prefix}/TWILIO_AUTH_TOKEN" },
-        { name = "TWILIO_PHONE_NUMBER", valueFrom = "${local.ssm_prefix}/TWILIO_PHONE_NUMBER" },
-        { name = "VAPID_PUBLIC_KEY", valueFrom = "${local.ssm_prefix}/VAPID_PUBLIC_KEY" },
-        { name = "VAPID_PRIVATE_KEY", valueFrom = "${local.ssm_prefix}/VAPID_PRIVATE_KEY" },
-        { name = "SES_FROM_EMAIL", valueFrom = "${local.ssm_prefix}/SES_FROM_EMAIL" },
-        { name = "ADMIN_USERNAME", valueFrom = "${local.ssm_prefix}/ADMIN_USERNAME" },
-        { name = "ADMIN_PASSWORD_HASH", valueFrom = "${local.ssm_prefix}/ADMIN_PASSWORD_HASH" },
-        { name = "CRON_SECRET", valueFrom = "${local.ssm_prefix}/CRON_SECRET" }
+        { name = "TWILIO_ACCOUNT_SID",   valueFrom = "${local.ssm_prefix}/TWILIO_ACCOUNT_SID" },
+        { name = "TWILIO_AUTH_TOKEN",    valueFrom = "${local.ssm_prefix}/TWILIO_AUTH_TOKEN" },
+        { name = "TWILIO_PHONE_NUMBER",  valueFrom = "${local.ssm_prefix}/TWILIO_PHONE_NUMBER" },
+        { name = "VAPID_PUBLIC_KEY",     valueFrom = "${local.ssm_prefix}/VAPID_PUBLIC_KEY" },
+        { name = "VAPID_PRIVATE_KEY",    valueFrom = "${local.ssm_prefix}/VAPID_PRIVATE_KEY" },
+        { name = "SES_FROM_EMAIL",       valueFrom = "${local.ssm_prefix}/SES_FROM_EMAIL" },
+        { name = "ADMIN_USERNAME",       valueFrom = "${local.ssm_prefix}/ADMIN_USERNAME" },
+        { name = "ADMIN_PASSWORD_HASH",  valueFrom = "${local.ssm_prefix}/ADMIN_PASSWORD_HASH" },
+        { name = "CRON_SECRET",          valueFrom = "${local.ssm_prefix}/CRON_SECRET" }
       ]
 
       logConfiguration = {
@@ -117,7 +237,11 @@ resource "aws_ecs_service" "app" {
   cluster         = data.aws_ecs_cluster.main.arn
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = var.app_desired_count
-  launch_type     = "FARGATE"
+
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+  }
 
   load_balancer {
     target_group_arn = var.alb_target_group_arn
@@ -125,23 +249,19 @@ resource "aws_ecs_service" "app" {
     container_port   = 3000
   }
 
-  network_configuration {
-    subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
-  }
-
   lifecycle {
     ignore_changes = [desired_count, task_definition]
   }
 
   tags = { Name = "santa-elena-app-${var.environment}" }
+
+  depends_on = [aws_ecs_cluster_capacity_providers.main]
 }
 
-# ─── Auto Scaling ─────────────────────────────────────────────────────────────
+# ─── Auto Scaling del servicio ECS (número de tareas) ────────────────────────
 
 resource "aws_appautoscaling_target" "app" {
-  max_capacity       = 4
+  max_capacity       = 3
   min_capacity       = 1
   resource_id        = "service/${data.aws_ecs_cluster.main.cluster_name}/${aws_ecs_service.app.name}"
   scalable_dimension = "ecs:service:DesiredCount"

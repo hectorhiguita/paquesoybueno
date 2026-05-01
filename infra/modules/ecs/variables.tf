@@ -51,3 +51,8 @@ variable "app_desired_count" {
   type    = number
   default = 1
 }
+
+variable "ec2_instance_type" {
+  type    = string
+  default = "t3.small"
+}
