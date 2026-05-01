@@ -71,7 +71,7 @@ export function RegisterForm({ veredas }: { veredas: SelectOption[] }) {
           <p className="text-gray-500 text-sm mt-3 leading-relaxed">
             Te enviamos un enlace a <strong>{form.email}</strong> para activar tu cuenta y crear tu contraseña.
           </p>
-          <p className="text-gray-400 text-xs mt-3">El enlace expira en 24 horas.</p>
+          <p className="text-gray-500 text-xs mt-3">El enlace expira en 24 horas.</p>
           <Link
             href="/login"
             className="inline-flex items-center justify-center mt-6 border border-gray-300 text-gray-700 font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors min-h-[44px]"
@@ -104,7 +104,7 @@ export function RegisterForm({ veredas }: { veredas: SelectOption[] }) {
                   }`}>
                     {i < step ? "✓" : i + 1}
                   </div>
-                  <span className={`text-xs mt-1 font-medium ${i === step ? "text-green-700" : "text-gray-400"}`}>
+                  <span className={`text-xs mt-1 font-medium ${i === step ? "text-green-700" : "text-gray-500"}`}>
                     {label}
                   </span>
                 </div>
@@ -135,17 +135,29 @@ export function RegisterForm({ veredas }: { veredas: SelectOption[] }) {
           {step === 2 && (
             <div className="flex flex-col gap-4">
               <h2 className="text-lg font-bold text-gray-800">Confirmar registro</h2>
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Nombre</span><span className="font-medium">{form.name}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Celular</span><span className="font-medium">{form.phone}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Correo</span><span className="font-medium">{form.email}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Vereda</span><span className="font-medium">{veredaLabel}</span></div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 text-sm shadow-sm">
+                <div className="grid grid-cols-[96px_1fr] gap-3 items-start">
+                  <span className="font-semibold text-gray-700">Nombre</span>
+                  <span className="font-medium text-gray-900 break-words">{form.name}</span>
+                </div>
+                <div className="grid grid-cols-[96px_1fr] gap-3 items-start">
+                  <span className="font-semibold text-gray-700">Celular</span>
+                  <span className="font-medium text-gray-900 break-words">{form.phone}</span>
+                </div>
+                <div className="grid grid-cols-[96px_1fr] gap-3 items-start">
+                  <span className="font-semibold text-gray-700">Correo</span>
+                  <span className="font-medium text-gray-900 break-words">{form.email}</span>
+                </div>
+                <div className="grid grid-cols-[96px_1fr] gap-3 items-start">
+                  <span className="font-semibold text-gray-700">Vereda</span>
+                  <span className="font-medium text-gray-900 break-words leading-relaxed">{veredaLabel}</span>
+                </div>
               </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900 leading-relaxed">
                 📧 Te enviaremos un enlace a <strong>{form.email}</strong> para crear tu contraseña.
               </div>
               {status === "error" && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{errorMsg}</p>
+                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 leading-relaxed">{errorMsg}</p>
               )}
             </div>
           )}

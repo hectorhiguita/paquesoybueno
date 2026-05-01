@@ -26,6 +26,14 @@ ENV DATABASE_URL="postgresql://postgres:dummy@localhost:5432/santa_elena"
 ENV NEXTAUTH_SECRET="build-time-dummy-secret-32-chars-min"
 ENV NEXTAUTH_URL="https://santaelenacomunidad.online"
 
+# Versión e identificador de revisión — se pasan desde el pipeline:
+#   docker build --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
+#                --build-arg APP_VERSION=$(node -p "require('./package.json').version") .
+ARG APP_VERSION=dev
+ARG GIT_COMMIT=unknown
+ENV NEXT_PUBLIC_APP_VERSION=${APP_VERSION}
+ENV NEXT_PUBLIC_GIT_COMMIT=${GIT_COMMIT}
+
 RUN npm run build
 
 # ─── Stage 3: runtime ─────────────────────────────────────────────────────────

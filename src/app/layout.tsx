@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toast } from "@/components/ui/Toast";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { Navbar } from "@/components/layout/Navbar";
+import { VersionBadge } from "@/components/ui/VersionBadge";
 
 export const metadata: Metadata = {
   title: "Santa Elena Platform",
@@ -28,6 +29,7 @@ export default function RootLayout({
         <Navbar />
         {children}
         <Toast />
+        <VersionBadge />
       </body>
     </html>
   );

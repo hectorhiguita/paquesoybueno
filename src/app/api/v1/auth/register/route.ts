@@ -129,7 +129,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const emailResult = await sendActivationEmail(normalizedEmail, name, activationUrl);
   if (!emailResult.success) {
     console.error("[register] Email send failed:", emailResult.error);
-    // No fatal — el usuario puede solicitar reenvío
+    return NextResponse.json(
+      {
+        error: {
+          code: "EMAIL_DELIVERY_FAILED",
+          message:
+            "No fue posible enviar el correo de activación. Intenta de nuevo en unos minutos.",
+          requestId: randomUUID(),
+        },
+      },
+      { status: 502 }
+    );
   }
 
   return NextResponse.json(

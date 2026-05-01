@@ -82,7 +82,7 @@ export async function sendActivationEmail(
       "",
       activationUrl,
       "",
-      "Este enlace es de uso unico y expira en 24 horas.",
+      "Este enlace es de uso único y expira en 24 horas.",
       "",
       "Si no creaste esta cuenta, ignora este mensaje.",
       "",
@@ -92,7 +92,7 @@ export async function sendActivationEmail(
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#15803d">Bienvenido a Santa Elena Platform</h2>
         <p>Hola <strong>${name}</strong>,</p>
-        <p>Gracias por registrarte. Para activar tu cuenta y crear tu contrasena, haz clic en el boton:</p>
+        <p>Gracias por registrarte. Para activar tu cuenta y crear tu contraseña, haz clic en el botón:</p>
         <p style="text-align:center;margin:32px 0">
           <a href="${activationUrl}"
              style="background:#15803d;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">
@@ -100,7 +100,7 @@ export async function sendActivationEmail(
           </a>
         </p>
         <p style="color:#6b7280;font-size:13px">
-          Este enlace es de uso unico y expira en 24 horas.<br>
+          Este enlace es de uso único y expira en 24 horas.<br>
           Si no creaste esta cuenta, ignora este mensaje.
         </p>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
@@ -122,17 +122,17 @@ export async function sendAccountLockedEmail(
     text: [
       "Hola,",
       "",
-      `Tu cuenta ha sido bloqueada temporalmente por ${minutesLeft} minutos debido a multiples intentos de inicio de sesion fallidos.`,
+      `Tu cuenta ha sido bloqueada temporalmente por ${minutesLeft} minutos debido a múltiples intentos de inicio de sesión fallidos.`,
       "",
-      "Si no fuiste tu, te recomendamos cambiar tu contrasena cuando puedas acceder nuevamente.",
+      "Si no fuiste tú, te recomendamos cambiar tu contraseña cuando puedas acceder nuevamente.",
       "",
       "-- Equipo Santa Elena Platform",
     ].join("\n"),
     html: `
       <p>Hola,</p>
       <p>Tu cuenta ha sido <strong>bloqueada temporalmente por ${minutesLeft} minutos</strong>
-         debido a multiples intentos de inicio de sesion fallidos.</p>
-      <p>Si no fuiste tu, te recomendamos cambiar tu contrasena cuando puedas acceder nuevamente.</p>
+         debido a múltiples intentos de inicio de sesión fallidos.</p>
+      <p>Si no fuiste tú, te recomendamos cambiar tu contraseña cuando puedas acceder nuevamente.</p>
       <p>-- Equipo Santa Elena Platform</p>
     `,
   });
