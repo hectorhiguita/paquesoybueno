@@ -103,7 +103,7 @@ resource "aws_autoscaling_group" "ecs" {
   min_size            = 1
   desired_capacity    = 1
   max_size            = 3
-  vpc_zone_identifier = var.private_subnet_ids
+  vpc_zone_identifier = var.public_subnet_ids
 
   launch_template {
     id      = aws_launch_template.ecs.id

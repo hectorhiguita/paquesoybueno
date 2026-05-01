@@ -116,6 +116,7 @@ module "ecs" {
   aws_account_id       = var.aws_account_id
   vpc_id               = module.vpc.vpc_id
   private_subnet_ids   = module.vpc.private_subnet_ids
+  public_subnet_ids    = module.vpc.public_subnet_ids
   alb_target_group_arn = module.alb.app_target_group_arn
   alb_sg_id            = module.alb.alb_sg_id
   ecr_repo_url         = module.ecr.app_repo_url

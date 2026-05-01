@@ -56,3 +56,8 @@ variable "ec2_instance_type" {
   type    = string
   default = "t3.small"
 }
+
+variable "public_subnet_ids" {
+  type        = list(string)
+  description = "Subnets públicas para el ASG — requieren salida a internet para que el agente ECS registre."
+}
