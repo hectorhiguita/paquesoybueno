@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/config";
 import { prisma } from "@/lib/prisma";
+import { DashboardListings } from "@/components/dashboard/DashboardListings";
 
 export const dynamic = "force-dynamic";
 
@@ -89,14 +90,6 @@ export default async function DashboardPage() {
   });
 
   const toolListings = myListings.filter((l) => l.type === "tool");
-
-  const typeLabel: Record<string, string> = {
-    service: "Servicio",
-    sale: "Venta",
-    trade: "Trueque",
-    tool: "Herramienta",
-    rent: "Arriendo",
-  };
 
   const statusBadge: Record<string, string> = {
     active: "bg-green-100 text-green-700",
@@ -189,34 +182,7 @@ export default async function DashboardPage() {
                 + Nueva →
               </Link>
             </div>
-            <div className="space-y-2">
-              {myListings.map((listing) => (
-                <div
-                  key={listing.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-gray-800 truncate">{listing.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {typeLabel[listing.type] ?? listing.type} ·{" "}
-                      {listing._count.ratings} calificación
-                      {listing._count.ratings !== 1 ? "es" : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${statusBadge[listing.status] ?? "bg-gray-100 text-gray-500"}`}
-                  >
-                    {listing.status === "active"
-                      ? "Activo"
-                      : listing.status === "flagged"
-                        ? "En revisión"
-                        : listing.status === "pending_review"
-                          ? "Pendiente"
-                          : "Inactivo"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <DashboardListings initialListings={myListings} userId={userId} />
           </div>
         )}
 

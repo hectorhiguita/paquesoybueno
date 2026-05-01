@@ -1,5 +1,6 @@
 import { PROVIDERS, MARKET_ITEMS, TOOLS } from "@/lib/mock-data";
 import { AdminCategoriesPanel } from "./AdminCategoriesPanel";
+import { AdminListingsPanel } from "./AdminListingsPanel";
 
 const REPORTS = [
   { id: "r1", reporter: "Ana Gómez", target: "Anuncio: Nevera Samsung", reason: "Precio sospechoso", status: "pending", date: "Hace 1 hora" },
@@ -33,6 +34,8 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+
+        <AdminListingsPanel />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Reportes pendientes */}

@@ -76,6 +76,9 @@ jobs:
           tags: |
             ${{ env.ECR_REPO }}:${{ steps.meta.outputs.tag }}
             ${{ env.ECR_REPO }}:latest
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.tag }}
+            GIT_COMMIT=${{ github.sha }}
           cache-from: type=registry,ref=${{ env.ECR_REPO }}:latest
           cache-to: type=inline
 

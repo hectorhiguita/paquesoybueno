@@ -99,7 +99,7 @@ describe("POST /api/v1/auth/verify", () => {
 
   it("returns 400 with INVALID_CODE when code is wrong", async () => {
     vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(MOCK_USER as never);
-    vi.mocked(verifyCode).mockReturnValueOnce(false);
+    vi.mocked(verifyCode).mockResolvedValueOnce(false);
 
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(400);
@@ -110,7 +110,7 @@ describe("POST /api/v1/auth/verify", () => {
 
   it("returns 400 with INVALID_CODE when code is expired", async () => {
     vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(MOCK_USER as never);
-    vi.mocked(verifyCode).mockReturnValueOnce(false);
+    vi.mocked(verifyCode).mockResolvedValueOnce(false);
 
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(400);
@@ -122,7 +122,7 @@ describe("POST /api/v1/auth/verify", () => {
 
   it("returns 200 and activates account on valid code", async () => {
     vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(MOCK_USER as never);
-    vi.mocked(verifyCode).mockReturnValueOnce(true);
+    vi.mocked(verifyCode).mockResolvedValueOnce(true);
     vi.mocked(prisma.user.update).mockResolvedValueOnce({} as never);
 
     const res = await POST(makeRequest(VALID_BODY));
@@ -133,7 +133,7 @@ describe("POST /api/v1/auth/verify", () => {
 
   it("calls prisma.user.update with phoneVerified: true on success", async () => {
     vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(MOCK_USER as never);
-    vi.mocked(verifyCode).mockReturnValueOnce(true);
+    vi.mocked(verifyCode).mockResolvedValueOnce(true);
     vi.mocked(prisma.user.update).mockResolvedValueOnce({} as never);
 
     await POST(makeRequest(VALID_BODY));
@@ -146,7 +146,7 @@ describe("POST /api/v1/auth/verify", () => {
 
   it("calls verifyCode with correct phone, communityId, and code", async () => {
     vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(MOCK_USER as never);
-    vi.mocked(verifyCode).mockReturnValueOnce(true);
+    vi.mocked(verifyCode).mockResolvedValueOnce(true);
     vi.mocked(prisma.user.update).mockResolvedValueOnce({} as never);
 
     await POST(makeRequest(VALID_BODY));
@@ -171,7 +171,7 @@ describe("POST /api/v1/auth/verify", () => {
 
   it("returns 500 when update throws", async () => {
     vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(MOCK_USER as never);
-    vi.mocked(verifyCode).mockReturnValueOnce(true);
+    vi.mocked(verifyCode).mockResolvedValueOnce(true);
     vi.mocked(prisma.user.update).mockRejectedValueOnce(new Error("DB down"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
