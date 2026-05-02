@@ -46,6 +46,7 @@ RUN apk add --no-cache openssl curl
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 # Indica a Prisma qué engine usar (ya incluido en la imagen, sin descargar)
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 ENV PRISMA_QUERY_ENGINE_LIBRARY="/app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node"
