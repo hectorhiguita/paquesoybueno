@@ -13,7 +13,7 @@ const STEPS = ["Datos personales", "Tu vereda", "Confirmar"] as const;
 
 type Status = "idle" | "submitting" | "success" | "error";
 
-export function RegisterForm({ veredas }: { veredas: SelectOption[] }) {
+export function RegisterForm({ veredas, googleEnabled = false }: { veredas: SelectOption[]; googleEnabled?: boolean }) {
   const [step, setStep] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -177,7 +177,7 @@ export function RegisterForm({ veredas }: { veredas: SelectOption[] }) {
           </div>
         </div>
 
-        {process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true" && (
+        {googleEnabled && (
           <div className="mt-4">
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">

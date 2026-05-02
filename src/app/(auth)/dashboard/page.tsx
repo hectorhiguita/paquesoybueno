@@ -20,6 +20,27 @@ interface UserProfile {
   _count: { ratingsReceived: number };
 }
 
+async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, name: true, email: true, phone: true, role: true,
+        isVerifiedProvider: true, avatarUrl: true, veredaId: true,
+        homeVereda: { select: { id: true, name: true } },
+        _count: { select: { ratingsReceived: true } },
+      },
+    }) as UserProfile | null;
+  } catch {
+    const basic = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, phone: true, role: true, isVerifiedProvider: true },
+    });
+    if (!basic) return null;
+    return { ...basic, avatarUrl: null, veredaId: null, homeVereda: null, _count: { ratingsReceived: 0 } };
+  }
+}
+
 export default async function DashboardPage() {
   const session = await auth();
   if (!session) redirect("/login");
@@ -28,21 +49,7 @@ export default async function DashboardPage() {
   const communityId = session.communityId;
 
   const [user, unreadMessages, unreadNotifs, myListings, veredas] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        isVerifiedProvider: true,
-        avatarUrl: true,
-        veredaId: true,
-        homeVereda: { select: { id: true, name: true } },
-        _count: { select: { ratingsReceived: true } },
-      },
-    }) as Promise<UserProfile | null>,
+    fetchUserProfile(userId),
     prisma.message.count({
       where: {
         communityId,

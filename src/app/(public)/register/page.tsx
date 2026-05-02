@@ -15,6 +15,7 @@ export default async function RegisterPage() {
   return (
     <RegisterForm
       veredas={veredas.map((v) => ({ value: v.id, label: buildVeredaLabel(v.name) }))}
+      googleEnabled={!!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
     />
   );
 }
