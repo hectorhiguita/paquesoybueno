@@ -65,11 +65,14 @@ model User {
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until")
   activeReportCount   Int       @default(0) @map("active_report_count")
+  veredaId            String?   @map("vereda_id") @db.Uuid
+  avatarUrl           String?   @map("avatar_url")
   createdAt           DateTime  @default(now()) @map("created_at")
 
   community       Community       @relation(fields: [communityId], references: [id])
   verifier        User?           @relation("VerifiedBy", fields: [verifiedBy], references: [id])
   verifiedUsers   User[]          @relation("VerifiedBy")
+  homeVereda      Vereda?         @relation("UserHomeVereda", fields: [veredaId], references: [id])
   listings        Listing[]
   ratingsGiven    Rating[]        @relation("RaterRatings")
   ratingsReceived Rating[]        @relation("ProviderRatings")
@@ -97,6 +100,7 @@ model Vereda {
   community Community      @relation(fields: [communityId], references: [id])
   listings  Listing[]
   follows   VeredaFollow[]
+  residents User[]         @relation("UserHomeVereda")
 
   @@unique([communityId, name])
   @@map("veredas")

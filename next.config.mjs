@@ -27,14 +27,17 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.r2.cloudflarestorage.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.amazonaws.com",
-      },
+      // Cloudflare R2 — endpoint interno (uploads vía SDK)
+      { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
+      // Cloudflare R2 — URL pública r2.dev (cuando public access está habilitado)
+      { protocol: "https", hostname: "*.r2.dev" },
+      // Dominio personalizado configurado en R2 / CDN
+      ...(process.env.R2_PUBLIC_HOSTNAME
+        ? [{ protocol: "https", hostname: process.env.R2_PUBLIC_HOSTNAME }]
+        : []),
+      // AWS S3 / SES assets
+      { protocol: "https", hostname: "*.amazonaws.com" },
+      { protocol: "https", hostname: "*.s3.amazonaws.com" },
     ],
   },
   // Módulos opcionales que no deben incluirse en el bundle del servidor

@@ -46,9 +46,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <span className="text-xl">⚙️</span>
           <span className="text-white font-bold text-sm">Panel Admin — Santa Elena</span>
+          <nav className="hidden sm:flex items-center gap-1">
+            <a
+              href="/admin"
+              className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                pathname === "/admin" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              Dashboard
+            </a>
+            <a
+              href="/admin/stats"
+              className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                pathname === "/admin/stats" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              📊 Analytics
+            </a>
+          </nav>
         </div>
         <button
           onClick={handleLogout}

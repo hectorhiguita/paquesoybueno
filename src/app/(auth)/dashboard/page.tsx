@@ -3,8 +3,22 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/config";
 import { prisma } from "@/lib/prisma";
 import { DashboardListings } from "@/components/dashboard/DashboardListings";
+import { DashboardProfileSection } from "@/components/dashboard/DashboardProfileSection";
 
 export const dynamic = "force-dynamic";
+
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  isVerifiedProvider: boolean;
+  avatarUrl: string | null;
+  veredaId: string | null;
+  homeVereda: { id: string; name: string } | null;
+  _count: { ratingsReceived: number };
+}
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -13,7 +27,7 @@ export default async function DashboardPage() {
   const userId = session.user.id;
   const communityId = session.communityId;
 
-  const [user, unreadMessages, unreadNotifs, myListings] = await Promise.all([
+  const [user, unreadMessages, unreadNotifs, myListings, veredas] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -21,29 +35,24 @@ export default async function DashboardPage() {
         name: true,
         email: true,
         phone: true,
+        role: true,
         isVerifiedProvider: true,
-        _count: {
-          select: { ratingsReceived: true },
-        },
+        avatarUrl: true,
+        veredaId: true,
+        homeVereda: { select: { id: true, name: true } },
+        _count: { select: { ratingsReceived: true } },
       },
-    }),
+    }) as Promise<UserProfile | null>,
     prisma.message.count({
       where: {
         communityId,
         delivered: false,
-        thread: {
-          OR: [{ participantA: userId }, { participantB: userId }],
-        },
+        thread: { OR: [{ participantA: userId }, { participantB: userId }] },
         senderId: { not: userId },
       },
     }),
     prisma.notification.count({
-      where: {
-        userId,
-        communityId,
-        read: false,
-        expiresAt: { gt: new Date() },
-      },
+      where: { userId, communityId, read: false, expiresAt: { gt: new Date() } },
     }),
     prisma.listing.findMany({
       where: { authorId: userId, communityId },
@@ -57,6 +66,11 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
       take: 5,
+    }),
+    prisma.vereda.findMany({
+      where: { communityId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -72,10 +86,7 @@ export default async function DashboardPage() {
     : null;
 
   const recentThreads = await prisma.messageThread.findMany({
-    where: {
-      communityId,
-      OR: [{ participantA: userId }, { participantB: userId }],
-    },
+    where: { communityId, OR: [{ participantA: userId }, { participantB: userId }] },
     include: {
       messages: {
         orderBy: { sentAt: "desc" },
@@ -100,48 +111,35 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-6 py-6">
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-5xl mx-auto">
           <p className="text-gray-500 text-sm">Bienvenido de nuevo</p>
-          <h1 className="text-2xl font-bold text-gray-800 mt-0.5">
-            {user.name}
-            {user.isVerifiedProvider && (
-              <span className="ml-2 text-sm bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full align-middle">
-                ✓ Verificado
-              </span>
-            )}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-800 mt-0.5">Mi panel</h1>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+
+        {/* Perfil + botón admin */}
+        <DashboardProfileSection
+          userId={userId}
+          initialName={user.name}
+          initialPhone={user.phone}
+          initialVeredaId={user.veredaId ?? null}
+          initialAvatarUrl={user.avatarUrl ?? null}
+          initialVeredaName={user.homeVereda?.name ?? null}
+          isVerifiedProvider={user.isVerifiedProvider}
+          isAdmin={user.role === "admin"}
+          veredas={veredas}
+        />
+
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            {
-              label: "Publicaciones",
-              value: myListings.length,
-              icon: "📋",
-              color: "bg-green-50 border-green-200",
-            },
-            {
-              label: "Calificación",
-              value: avgRating ? `⭐ ${avgRating}` : "—",
-              icon: "⭐",
-              color: "bg-yellow-50 border-yellow-200",
-            },
-            {
-              label: "Mensajes sin leer",
-              value: unreadMessages,
-              icon: "✉️",
-              color: "bg-blue-50 border-blue-200",
-            },
-            {
-              label: "Notificaciones",
-              value: unreadNotifs,
-              icon: "🔔",
-              color: "bg-purple-50 border-purple-200",
-            },
+            { label: "Publicaciones", value: myListings.length, icon: "📋", color: "bg-green-50 border-green-200" },
+            { label: "Calificación", value: avgRating ? `⭐ ${avgRating}` : "—", icon: "⭐", color: "bg-yellow-50 border-yellow-200" },
+            { label: "Mensajes sin leer", value: unreadMessages, icon: "✉️", color: "bg-blue-50 border-blue-200" },
+            { label: "Notificaciones", value: unreadNotifs, icon: "🔔", color: "bg-purple-50 border-purple-200" },
           ].map(({ label, value, icon, color }) => (
             <div key={label} className={`bg-white border rounded-2xl p-5 ${color}`}>
               <p className="text-2xl">{icon}</p>
@@ -199,8 +197,7 @@ export default async function DashboardPage() {
               {recentThreads.map((thread) => {
                 const other = thread.userA.id === userId ? thread.userB : thread.userA;
                 const lastMsg = thread.messages[0];
-                const isUnread =
-                  !!lastMsg && lastMsg.senderId !== userId;
+                const isUnread = !!lastMsg && lastMsg.senderId !== userId;
                 return (
                   <Link
                     key={thread.id}
@@ -240,9 +237,7 @@ export default async function DashboardPage() {
                   <div className="flex-1">
                     <p className="font-semibold text-sm text-gray-800">{tool.title}</p>
                   </div>
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusBadge[tool.status] ?? "bg-gray-100 text-gray-500"}`}
-                  >
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusBadge[tool.status] ?? "bg-gray-100 text-gray-500"}`}>
                     {tool.status === "active" ? "Disponible" : "No disponible"}
                   </span>
                 </div>

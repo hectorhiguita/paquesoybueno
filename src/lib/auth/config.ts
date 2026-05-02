@@ -132,7 +132,7 @@ export const authConfig: NextAuthConfig = {
   // Callbacks
   // ------------------------------------------------------------------
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
       if (user) {
         const appUser = user as AppUser;
         token.userId = appUser.id ?? "";
@@ -142,11 +142,11 @@ export const authConfig: NextAuthConfig = {
         token.phoneVerified = appUser.phoneVerified;
       }
 
-      // Google OAuth first login: check phone verification (Req 1.8)
+      // Google OAuth first login: sync DB user (Req 1.8)
       if (account?.provider === "google" && user) {
         const dbUser = await prisma.user.findFirst({
           where: { email: user.email ?? "" },
-          select: { phoneVerified: true, id: true, communityId: true, role: true, isVerifiedProvider: true },
+          select: { id: true, communityId: true, role: true, isVerifiedProvider: true, phoneVerified: true },
         });
 
         if (dbUser) {
@@ -157,7 +157,29 @@ export const authConfig: NextAuthConfig = {
           token.phoneVerified = dbUser.phoneVerified;
           token.requiresPhoneVerification = !dbUser.phoneVerified;
         } else {
+          // New Google user — store Google info for complete-profile page
           token.requiresPhoneVerification = true;
+          token.googleName = user.name ?? "";
+          token.googleEmail = user.email ?? "";
+        }
+      }
+
+      // On session update (trigger=update): re-sync DB user for Google accounts
+      if (trigger === "update" && token.requiresPhoneVerification) {
+        const email = (token.googleEmail as string | undefined) ?? (token.email as string | undefined);
+        if (email) {
+          const dbUser = await prisma.user.findFirst({
+            where: { email },
+            select: { id: true, communityId: true, role: true, isVerifiedProvider: true, phoneVerified: true },
+          });
+          if (dbUser) {
+            token.userId = dbUser.id;
+            token.communityId = dbUser.communityId;
+            token.role = dbUser.role as "member" | "admin";
+            token.isVerifiedProvider = dbUser.isVerifiedProvider;
+            token.phoneVerified = dbUser.phoneVerified;
+            token.requiresPhoneVerification = false;
+          }
         }
       }
 

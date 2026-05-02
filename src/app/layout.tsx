@@ -4,6 +4,8 @@ import { Toast } from "@/components/ui/Toast";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { Navbar } from "@/components/layout/Navbar";
 import { VersionBadge } from "@/components/ui/VersionBadge";
+import { Providers } from "@/components/Providers";
+import { SessionExpiryWarning } from "@/components/ui/SessionExpiryWarning";
 
 export const metadata: Metadata = {
   title: "Santa Elena Platform",
@@ -25,11 +27,14 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        <OfflineBanner />
-        <Navbar />
-        {children}
-        <Toast />
-        <VersionBadge />
+        <Providers>
+          <OfflineBanner />
+          <Navbar />
+          {children}
+          <Toast />
+          <VersionBadge />
+          <SessionExpiryWarning />
+        </Providers>
       </body>
     </html>
   );
