@@ -1,0 +1,3 @@
+ALTER TABLE "users"
+  ADD COLUMN IF NOT EXISTS "vereda_id" UUID REFERENCES "veredas"("id") ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS "avatar_url" TEXT;
