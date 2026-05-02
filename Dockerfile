@@ -40,8 +40,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# OpenSSL requerido por Prisma en runtime
-RUN apk add --no-cache openssl
+# OpenSSL requerido por Prisma en runtime; curl requerido por el healthcheck ECS.
+RUN apk add --no-cache openssl curl
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
