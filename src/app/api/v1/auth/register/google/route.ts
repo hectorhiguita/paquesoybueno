@@ -32,7 +32,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { name, email, phone, communityId, veredaId } = parsed.data;
   const normalizedEmail = email.trim().toLowerCase();
 
-  try {
+  const upsert = async (withVereda: boolean) => {
+    const veredaData = withVereda && veredaId ? { veredaId } : {};
+
     const existing = await prisma.user.findFirst({
       where: { communityId, OR: [{ email: normalizedEmail }, { phone }] },
       select: { id: true, email: true, phoneVerified: true, passwordHash: true },
@@ -44,27 +46,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       await prisma.user.update({
         where: { id: existing.id },
-        data: { name, phone, phoneVerified: true, ...(veredaId ? { veredaId } : {}) },
+        data: { name, phone, phoneVerified: true, ...veredaData },
+        select: { id: true },
       });
       return NextResponse.json({ data: { message: "Cuenta activada" } }, { status: 200 });
     }
 
     await prisma.user.create({
-      data: {
-        id: randomUUID(),
-        communityId,
-        email: normalizedEmail,
-        phone,
-        name,
-        phoneVerified: true,
-        ...(veredaId ? { veredaId } : {}),
-      },
+      data: { id: randomUUID(), communityId, email: normalizedEmail, phone, name, phoneVerified: true, ...veredaData },
+      select: { id: true },
     });
-
     return NextResponse.json({ data: { message: "Cuenta creada exitosamente" } }, { status: 201 });
+  };
+
+  try {
+    return await upsert(true);
   } catch (err) {
-    if ((err as { code?: string })?.code === "P2002") {
-      return Errors.conflict("Ya existe una cuenta con estos datos");
+    const code = (err as { code?: string })?.code;
+    if (code === "P2002") return Errors.conflict("Ya existe una cuenta con estos datos");
+    // P2022 = column does not exist (migrations pending) — retry without veredaId
+    if (code === "P2022") {
+      try {
+        return await upsert(false);
+      } catch (err2) {
+        if ((err2 as { code?: string })?.code === "P2002") return Errors.conflict("Ya existe una cuenta con estos datos");
+        console.error("[register/google] fallback", err2);
+        return Errors.internal();
+      }
     }
     console.error("[register/google]", err);
     return Errors.internal();
