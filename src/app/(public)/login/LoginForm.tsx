@@ -102,7 +102,7 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
                 </div>
               </div>
               <button
-                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+                onClick={() => signIn("google", { callbackUrl: "/complete-profile" })}
                 className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px]"
               >
                 <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">

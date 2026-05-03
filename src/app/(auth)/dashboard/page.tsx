@@ -44,6 +44,7 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
 export default async function DashboardPage() {
   const session = await auth();
   if (!session) redirect("/login");
+  if (session.requiresPhoneVerification) redirect("/complete-profile");
 
   const userId = session.user.id;
   const communityId = session.communityId;
