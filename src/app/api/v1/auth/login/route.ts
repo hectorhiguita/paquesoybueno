@@ -140,6 +140,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: 0, lockedUntil: null, status: "active" },
+      select: { id: true },
     });
   } catch (err) {
     console.error("[login] Failed to reset attempt counter:", err);
@@ -183,6 +184,7 @@ async function incrementFailedAttempts(
         lockedUntil,
         status: "locked",
       },
+      select: { id: true },
     });
 
     // Notify via email (non-fatal)
@@ -193,6 +195,7 @@ async function incrementFailedAttempts(
     await prisma.user.update({
       where: { id: userId },
       data: { failedLoginAttempts: newCount },
+      select: { id: true },
     });
   }
 }

@@ -59,6 +59,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         status: "active",
         verifiedAt: new Date(),
       },
+      select: { id: true },
     });
   } catch (err) {
     console.error("[activate/verify-otp] DB error:", err);

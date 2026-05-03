@@ -157,6 +157,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     await prisma.user.update({
       where: { id: user.id },
       data: { passwordHash },
+      select: { id: true },
     });
   } catch (err) {
     console.error("[reset-password PUT] DB update error:", err);

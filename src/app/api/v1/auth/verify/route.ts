@@ -68,6 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await prisma.user.update({
       where: { id: user.id },
       data: { phoneVerified: true },
+      select: { id: true },
     });
   } catch (err) {
     console.error("[verify] DB update error:", err);

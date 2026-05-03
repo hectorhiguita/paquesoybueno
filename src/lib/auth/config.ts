@@ -100,6 +100,7 @@ export const authConfig: NextAuthConfig = {
         await prisma.user.update({
           where: { id: user.id },
           data: { failedLoginAttempts: 0, lockedUntil: null },
+          select: { id: true },
         });
 
         return {
@@ -241,6 +242,7 @@ async function incrementFailedAttempts(
         lockedUntil,
         status: "locked",
       },
+      select: { id: true },
     });
 
     // Notify via email (non-fatal)
@@ -251,6 +253,7 @@ async function incrementFailedAttempts(
     await prisma.user.update({
       where: { id: userId },
       data: { failedLoginAttempts: newCount },
+      select: { id: true },
     });
   }
 }

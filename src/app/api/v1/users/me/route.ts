@@ -33,6 +33,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!user) return Errors.notFound("Usuario no encontrado");
     return NextResponse.json({ data: { user } });
   } catch (err) {
+    if ((err as { code?: string })?.code === "P2022") {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: context.userId },
+          select: { id: true, name: true, email: true, phone: true, phoneVerified: true, isVerifiedProvider: true, role: true, createdAt: true },
+        });
+        if (!user) return Errors.notFound("Usuario no encontrado");
+        return NextResponse.json({ data: { user: { ...user, avatarUrl: null, veredaId: null, homeVereda: null } } });
+      } catch (fallbackErr) {
+        console.error("[GET /users/me] fallback error:", fallbackErr);
+        return Errors.internal();
+      }
+    }
     console.error("[GET /users/me]", err);
     return Errors.internal();
   }
@@ -62,14 +75,26 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       if (!vereda) return Errors.notFound("Vereda no encontrada");
     }
 
-    const updated = await prisma.user.update({
-      where: { id: context.userId },
-      data: {
-        ...(name ? { name } : {}),
-        ...(veredaId !== undefined ? { veredaId } : {}),
-      },
-      select: { id: true, name: true, veredaId: true, avatarUrl: true },
-    });
+    let updated: { id: string; name: string; veredaId?: string | null; avatarUrl?: string | null };
+    try {
+      updated = await prisma.user.update({
+        where: { id: context.userId },
+        data: {
+          ...(name ? { name } : {}),
+          ...(veredaId !== undefined ? { veredaId } : {}),
+        },
+        select: { id: true, name: true, veredaId: true, avatarUrl: true },
+      });
+    } catch (updateErr) {
+      if ((updateErr as { code?: string })?.code !== "P2022") throw updateErr;
+      // veredaId/avatarUrl columns not yet in DB — update only name
+      const fallback = await prisma.user.update({
+        where: { id: context.userId },
+        data: { ...(name ? { name } : {}) },
+        select: { id: true, name: true },
+      });
+      updated = { ...fallback, veredaId: null, avatarUrl: null };
+    }
 
     return NextResponse.json({ data: { user: updated } });
   } catch (err) {

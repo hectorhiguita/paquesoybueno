@@ -30,10 +30,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const buffer = Buffer.from(await file.arrayBuffer());
     const { url } = await uploadImage(buffer, filename, file.type);
 
-    await prisma.user.update({
-      where: { id: context.userId },
-      data: { avatarUrl: url },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: context.userId },
+        data: { avatarUrl: url },
+        select: { id: true },
+      });
+    } catch (updateErr) {
+      if ((updateErr as { code?: string })?.code !== "P2022") throw updateErr;
+      // avatarUrl column not yet in DB (pending migration) — upload succeeded
+    }
 
     return NextResponse.json({ data: { avatarUrl: url } });
   } catch (err) {

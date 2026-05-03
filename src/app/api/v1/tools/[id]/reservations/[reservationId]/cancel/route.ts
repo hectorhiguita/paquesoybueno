@@ -101,6 +101,7 @@ export async function PATCH(
         await prisma.user.update({
           where: { id: userId },
           data: { verificationReason: updatedReason },
+          select: { id: true },
         });
       } catch (profileErr) {
         // Non-fatal: log but don't fail the cancellation

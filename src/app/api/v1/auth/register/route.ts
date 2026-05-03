@@ -93,6 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           email: normalizedEmail,
           phone: normalizedPhone,
         },
+        select: { id: true },
       });
     } else {
       const user = await prisma.user.create({

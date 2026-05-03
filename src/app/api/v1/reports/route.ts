@@ -84,6 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await prisma.user.update({
           where: { id: targetUserId },
           data: { status: "suspended" },
+          select: { id: true },
         });
 
         // Notify admins

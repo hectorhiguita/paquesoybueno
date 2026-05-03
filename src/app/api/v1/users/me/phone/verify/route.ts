@@ -37,6 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await prisma.user.update({
       where: { id: context.userId },
       data: { phone, phoneVerified: true },
+      select: { id: true },
     });
 
     return NextResponse.json({ data: { message: "Teléfono actualizado exitosamente" } });
