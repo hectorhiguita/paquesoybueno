@@ -141,6 +141,7 @@ describe("POST /api/v1/auth/verify", () => {
     expect(vi.mocked(prisma.user.update)).toHaveBeenCalledWith({
       where: { id: MOCK_USER.id },
       data: { phoneVerified: true },
+      select: { id: true },
     });
   });
 

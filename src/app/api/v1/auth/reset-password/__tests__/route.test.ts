@@ -259,6 +259,7 @@ describe("PUT /api/v1/auth/reset-password", () => {
     expect(vi.mocked(prisma.user.update)).toHaveBeenCalledWith({
       where: { id: MOCK_USER.id },
       data: { passwordHash: "pbkdf2:salt:hash" },
+      select: { id: true },
     });
   });
 
