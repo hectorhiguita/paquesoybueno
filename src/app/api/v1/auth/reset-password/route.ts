@@ -41,7 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (user) {
       const token = generateResetToken(email, communityId);
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const appUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://santaelenacomunidad.online";
       const resetLink = `${appUrl}/reset-password?token=${token}`;
 
       await sendEmail({
