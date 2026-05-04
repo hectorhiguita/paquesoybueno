@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth/config";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { parseToolMeta } from "@/lib/tool-meta";
+import { isSafeImageUrl } from "@/lib/utils/image";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export default async function ToolsPage() {
                 key={tool.id}
                 className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow"
               >
-                {tool.images[0]?.url ? (
+                {isSafeImageUrl(tool.images[0]?.url) ? (
                   <img
                     src={tool.images[0].url}
                     alt={tool.title}

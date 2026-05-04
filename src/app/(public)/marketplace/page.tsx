@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
+import { isSafeImageUrl } from "@/lib/utils/image";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,7 @@ export default async function MarketplacePage({
                     href={`/marketplace/${item.id}`}
                     className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md hover:border-green-300 transition-all block"
                   >
-                    {item.images[0]?.url ? (
+                    {isSafeImageUrl(item.images[0]?.url) ? (
                       <img
                         src={item.images[0].url}
                         alt={item.title}

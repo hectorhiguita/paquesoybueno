@@ -174,6 +174,10 @@ export const authConfig: NextAuthConfig = {
               select: { id: true },
             });
             token.userId = newId;
+            token.communityId = SANTA_ELENA_COMMUNITY_ID;
+            token.role = "member";
+            token.isVerifiedProvider = false;
+            token.phoneVerified = false;
           } catch (createErr) {
             // P2002: race condition — another request already created this email
             if ((createErr as { code?: string })?.code === "P2002") {

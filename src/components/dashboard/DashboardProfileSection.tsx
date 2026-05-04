@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { EditProfilePanel } from "./EditProfilePanel";
+import { isSafeImageUrl } from "@/lib/utils/image";
 
 interface Vereda { id: string; name: string }
 
@@ -68,7 +69,7 @@ export function DashboardProfileSection({
       <div className="bg-white border border-gray-200 rounded-2xl p-6">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full overflow-hidden bg-green-100 flex items-center justify-center flex-shrink-0">
-            {avatarUrl ? (
+            {isSafeImageUrl(avatarUrl) ? (
               <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               <span className="text-2xl font-bold text-green-700">{name[0]?.toUpperCase()}</span>

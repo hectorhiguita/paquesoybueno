@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
+import { isSafeImageUrl } from "@/lib/utils/image";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function MarketItemPage({ params }: { params: { id: string 
 
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          {item.images[0]?.url ? (
+          {isSafeImageUrl(item.images[0]?.url) ? (
             <img src={item.images[0].url} alt={item.title} className="h-56 w-full object-cover" />
           ) : (
             <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-56 flex items-center justify-center text-7xl">
@@ -77,7 +78,7 @@ export default async function MarketItemPage({ params }: { params: { id: string 
           <div className="p-6">
             {item.images.length > 1 && (
               <div className="grid grid-cols-4 gap-2 mb-5">
-                {item.images.slice(1, 5).map((image) => (
+                {item.images.slice(1, 5).filter((img) => isSafeImageUrl(img.url)).map((image) => (
                   <img
                     key={image.id}
                     src={image.url}

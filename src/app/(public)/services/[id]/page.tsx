@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
+import { isSafeImageUrl } from "@/lib/utils/image";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
         {/* Perfil */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          {listing.images[0]?.url && (
+          {isSafeImageUrl(listing.images[0]?.url) && (
             <div className="mb-5">
               <img
                 src={listing.images[0].url}
@@ -76,7 +77,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
               />
               {listing.images.length > 1 && (
                 <div className="grid grid-cols-4 gap-2 mt-3">
-                  {listing.images.slice(1, 5).map((image) => (
+                  {listing.images.slice(1, 5).filter((img) => isSafeImageUrl(img.url)).map((image) => (
                     <img
                       key={image.id}
                       src={image.url}
