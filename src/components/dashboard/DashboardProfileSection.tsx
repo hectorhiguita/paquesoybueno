@@ -34,6 +34,7 @@ export function DashboardProfileSection({
   const [veredaId, setVeredaId] = useState(initialVeredaId);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [promotingAdmin, setPromotingAdmin] = useState(false);
+  const [promoteError, setPromoteError] = useState("");
 
   const currentVeredaName =
     veredaId
@@ -49,15 +50,22 @@ export function DashboardProfileSection({
 
   const handlePromoteAdmin = async () => {
     setPromotingAdmin(true);
+    setPromoteError("");
     try {
       const res = await fetch("/api/v1/admin/auth/promote", { method: "POST" });
       if (res.ok) {
         window.location.href = "/admin";
+        return;
+      }
+      if (res.status === 401) {
+        setPromoteError("Sesión expirada. Recarga la página e intenta de nuevo.");
+      } else if (res.status === 403) {
+        setPromoteError("Tu cuenta aún no tiene permisos de administrador en la base de datos.");
       } else {
-        alert("No se pudo acceder al panel admin.");
+        setPromoteError("No se pudo acceder al panel admin. Intenta de nuevo.");
       }
     } catch {
-      alert("Error de conexión");
+      setPromoteError("Error de conexión. Verifica tu red e intenta de nuevo.");
     } finally {
       setPromotingAdmin(false);
     }
@@ -97,7 +105,7 @@ export function DashboardProfileSection({
         </div>
 
         {isAdmin && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
             <button
               onClick={handlePromoteAdmin}
               disabled={promotingAdmin}
@@ -105,6 +113,11 @@ export function DashboardProfileSection({
             >
               {promotingAdmin ? "Accediendo..." : "⚙️ Ir al panel de administración"}
             </button>
+            {promoteError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {promoteError}
+              </p>
+            )}
           </div>
         )}
       </div>

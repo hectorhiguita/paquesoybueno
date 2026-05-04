@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 const PUBLIC_LINKS = [
   { href: "/services", label: "Servicios" },
@@ -9,37 +9,9 @@ const PUBLIC_LINKS = [
   { href: "/tools", label: "Herramientas" },
 ];
 
-interface SessionResponse {
-  user?: { id?: string | null; name?: string | null } | null;
-}
-
 export function Navbar() {
-  const [hasSession, setHasSession] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadSession = async () => {
-      try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as SessionResponse;
-        if (!cancelled) {
-          setHasSession(Boolean(data?.user?.id));
-        }
-      } catch {
-        if (!cancelled) {
-          setHasSession(false);
-        }
-      }
-    };
-
-    void loadSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: session, status } = useSession();
+  const loggedIn = status === "authenticated" && Boolean(session?.user?.id);
 
   return (
     <nav className="w-full bg-green-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
@@ -58,7 +30,9 @@ export function Navbar() {
       </ul>
 
       <div className="flex items-center gap-3">
-        {hasSession ? (
+        {status === "loading" ? (
+          <div className="h-9 w-24 rounded-lg bg-white/20 animate-pulse" />
+        ) : loggedIn ? (
           <>
             <Link
               href="/dashboard"
