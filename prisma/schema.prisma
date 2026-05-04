@@ -52,7 +52,7 @@ model User {
   id                  String     @id @default(uuid()) @db.Uuid
   communityId         String     @map("community_id") @db.Uuid
   email               String
-  phone               String
+  phone               String?
   name                String
   passwordHash        String?    @map("password_hash")
   role                UserRole   @default(member)

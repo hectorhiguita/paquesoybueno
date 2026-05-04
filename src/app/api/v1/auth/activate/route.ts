@@ -4,9 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
 import { validateActivationToken, consumeActivationToken } from "@/lib/activation-tokens";
 import { hashPassword } from "@/lib/auth/password";
-import { generateVerificationCode, storeVerificationCode } from "@/lib/verification";
-import { sendVerificationSms } from "@/lib/sms";
-import { storePendingActivation } from "@/lib/pending-activation";
 
 const activateSchema = z.object({
   token:           z.string().min(64, "Token inválido"),
@@ -19,7 +16,8 @@ const activateSchema = z.object({
 
 /**
  * POST /api/v1/auth/activate
- * Valida el token, prepara la contraseña y envía OTP por SMS.
+ * Valida el token, establece la contraseña y activa la cuenta directamente.
+ * El token de activación prueba la propiedad del correo — no se requiere OTP adicional.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -37,20 +35,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { token, password } = parsed.data;
 
-  // Validar token (sin consumirlo aún)
   const entry = await validateActivationToken(token);
   if (!entry) {
     return Errors.validation("El enlace de activación es inválido o ya fue utilizado", "token");
   }
 
-  let user: { id: string; phone: string; communityId: string } | null;
+  let user: { id: string } | null;
   try {
     user = await prisma.user.findUnique({
       where: { id: entry.userId },
-      select: { id: true, phone: true, communityId: true },
+      select: { id: true },
     });
   } catch (err) {
-    console.error("[activate] DB read error:", err);
+    console.error("[activate POST] DB read error:", err);
     return Errors.internal();
   }
 
@@ -58,42 +55,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return Errors.notFound("Usuario no encontrado");
   }
 
-  const passwordHash = await hashPassword(password);
-
-  const code = generateVerificationCode();
-  await storeVerificationCode(user.phone, user.communityId, code);
-  storePendingActivation(token, {
-    userId: user.id,
-    communityId: user.communityId,
-    phone: user.phone,
-    passwordHash,
-  });
-
-  const smsResult = await sendVerificationSms(user.phone, code);
-  if (!smsResult.success) {
-    console.error("[activate] SMS send failed:", smsResult.error);
-    return NextResponse.json(
-      {
-        error: {
-          code: "SMS_SEND_FAILED",
-          message: "No fue posible enviar el código OTP por SMS. Intenta de nuevo.",
-          requestId: crypto.randomUUID(),
-        },
-      },
-      { status: 502 }
-    );
+  let passwordHash: string;
+  try {
+    passwordHash = await hashPassword(password);
+  } catch (err) {
+    console.error("[activate POST] hashPassword error:", err);
+    return Errors.internal();
   }
 
-  const maskedPhone = user.phone.length >= 4 ? `***${user.phone.slice(-4)}` : user.phone;
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        phoneVerified: true,
+        status: "active",
+        verifiedAt: new Date(),
+      },
+      select: { id: true },
+    });
+  } catch (err) {
+    console.error("[activate POST] DB update error:", err);
+    return Errors.internal();
+  }
+
+  // Consume the token so it can't be reused
+  await consumeActivationToken(token);
 
   return NextResponse.json(
-    {
-      data: {
-        requiresOtp: true,
-        maskedPhone,
-        message: "Te enviamos un código OTP por SMS para completar la activación.",
-      },
-    },
+    { data: { message: "Cuenta activada exitosamente. Ya puedes iniciar sesión." } },
     { status: 200 }
   );
 }

@@ -8,6 +8,7 @@
  * Requirements: 1.5, 1.6, 1.7, 1.8
  */
 
+import { randomUUID } from "crypto";
 import NextAuth, { type NextAuthConfig, type User } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -15,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 import { sendAccountLockedEmail } from "@/lib/email";
 import { loginSchema } from "@/lib/validations/auth";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
 interface AppUser extends User {
   communityId: string;
@@ -158,10 +160,41 @@ export const authConfig: NextAuthConfig = {
           token.phoneVerified = dbUser.phoneVerified;
           token.requiresPhoneVerification = !dbUser.phoneVerified;
         } else {
-          // New Google user — store Google info for complete-profile page
-          token.requiresPhoneVerification = true;
+          // New Google user — save email to DB immediately (phone added in complete-profile)
+          const normalizedEmail = (user.email ?? "").trim().toLowerCase();
+          const newId = randomUUID();
+          try {
+            await prisma.user.create({
+              data: {
+                id: newId,
+                communityId: SANTA_ELENA_COMMUNITY_ID,
+                email: normalizedEmail,
+                name: user.name ?? "",
+              },
+              select: { id: true },
+            });
+            token.userId = newId;
+          } catch (createErr) {
+            // P2002: race condition — another request already created this email
+            if ((createErr as { code?: string })?.code === "P2002") {
+              const existing = await prisma.user.findFirst({
+                where: { email: normalizedEmail },
+                select: { id: true, phoneVerified: true },
+              });
+              if (existing) {
+                token.userId = existing.id;
+                if (existing.phoneVerified) {
+                  token.requiresPhoneVerification = false;
+                }
+              }
+            }
+            // Other errors: fall through, token.userId stays as Google sub
+          }
+          if (token.requiresPhoneVerification !== false) {
+            token.requiresPhoneVerification = true;
+          }
           token.googleName = user.name ?? "";
-          token.googleEmail = user.email ?? "";
+          token.googleEmail = normalizedEmail;
         }
       }
 
@@ -179,7 +212,9 @@ export const authConfig: NextAuthConfig = {
             token.role = dbUser.role as "member" | "admin";
             token.isVerifiedProvider = dbUser.isVerifiedProvider;
             token.phoneVerified = dbUser.phoneVerified;
-            token.requiresPhoneVerification = false;
+            if (dbUser.phoneVerified) {
+              token.requiresPhoneVerification = false;
+            }
           }
         }
       }

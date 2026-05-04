@@ -41,7 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (existing) {
-      if (existing.phoneVerified && existing.passwordHash) {
+      if (existing.phoneVerified) {
         return Errors.conflict("Ya existe una cuenta con estos datos. Intenta iniciar sesión.");
       }
       await prisma.user.update({

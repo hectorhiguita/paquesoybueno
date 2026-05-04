@@ -8,7 +8,7 @@ interface Vereda { id: string; name: string }
 interface Props {
   userId: string;
   initialName: string;
-  initialPhone: string;
+  initialPhone: string | null;
   initialVeredaId: string | null;
   initialAvatarUrl: string | null;
   initialVeredaName: string | null;
@@ -112,7 +112,7 @@ export function DashboardProfileSection({
         <EditProfilePanel
           userId={userId}
           currentName={name}
-          currentPhone={initialPhone}
+          currentPhone={initialPhone ?? ""}
           currentVeredaId={veredaId}
           currentAvatarUrl={avatarUrl}
           veredas={veredas}
