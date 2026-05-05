@@ -1,61 +1,40 @@
 /**
- * Cloudflare R2 storage client (S3-compatible).
- * Falls back to a mock URL in dev/test when env vars are absent.
- *
- * Requirements: 3.4
+ * AWS S3 storage client.
+ * Uses IAM task role credentials automatically when running on ECS.
+ * Falls back to a mock URL in dev/test when S3_BUCKET_NAME is absent.
  */
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-const {
-  R2_ACCOUNT_ID,
-  R2_ACCESS_KEY_ID,
-  R2_SECRET_ACCESS_KEY,
-  R2_BUCKET_NAME,
-  R2_PUBLIC_URL,
-} = process.env;
+const BUCKET = process.env.S3_BUCKET_NAME;
+const REGION = process.env.AWS_REGION ?? "us-east-1";
+const PUBLIC_URL = process.env.S3_PUBLIC_URL; // optional CloudFront / custom domain
 
-const isConfigured =
-  R2_ACCOUNT_ID &&
-  R2_ACCESS_KEY_ID &&
-  R2_SECRET_ACCESS_KEY &&
-  R2_BUCKET_NAME &&
-  R2_PUBLIC_URL;
-
-let s3Client: S3Client | null = null;
-
-if (isConfigured) {
-  s3Client = new S3Client({
-    region: "auto",
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: R2_ACCESS_KEY_ID!,
-      secretAccessKey: R2_SECRET_ACCESS_KEY!,
-    },
-  });
+let s3: S3Client | null = null;
+if (BUCKET) {
+  s3 = new S3Client({ region: REGION });
 }
 
-/**
- * Upload a file buffer to Cloudflare R2.
- * In dev/test mode (env vars absent) returns a mock localhost URL.
- */
 export async function uploadImage(
   file: Buffer,
   filename: string,
   mimeType: string
 ): Promise<{ url: string }> {
-  if (!isConfigured || !s3Client) {
-    // Dev/test fallback
+  if (!BUCKET || !s3) {
     return { url: `http://localhost:3000/uploads/${filename}` };
   }
 
-  await s3Client.send(
+  await s3.send(
     new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME!,
+      Bucket: BUCKET,
       Key: filename,
       Body: file,
       ContentType: mimeType,
     })
   );
 
-  return { url: `${R2_PUBLIC_URL}/${filename}` };
+  const url = PUBLIC_URL
+    ? `${PUBLIC_URL}/${filename}`
+    : `https://${BUCKET}.s3.${REGION}.amazonaws.com/${filename}`;
+
+  return { url };
 }
