@@ -1,19 +1,26 @@
-import { PROVIDERS, MARKET_ITEMS, TOOLS } from "@/lib/mock-data";
+import { prisma } from "@/lib/prisma";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { AdminCategoriesPanel } from "./AdminCategoriesPanel";
 import { AdminListingsPanel } from "./AdminListingsPanel";
+import { AdminMembersPanel } from "./AdminMembersPanel";
+import { AdminReportsPanel } from "./AdminReportsPanel";
 
-const REPORTS = [
-  { id: "r1", reporter: "Ana Gómez", target: "Anuncio: Nevera Samsung", reason: "Precio sospechoso", status: "pending", date: "Hace 1 hora" },
-  { id: "r2", reporter: "Pedro Álvarez", target: "Usuario: Miguel Ruiz", reason: "Comportamiento inapropiado", status: "pending", date: "Hace 3 horas" },
-  { id: "r3", reporter: "Claudia Herrera", target: "Anuncio: Bicicleta Trek", reason: "Descripción engañosa", status: "resolved", date: "Ayer" },
-];
+async function getStats() {
+  const communityId = SANTA_ELENA_COMMUNITY_ID;
+  const [totalUsers, verifiedProviders, totalListings, totalTools, pendingReports] =
+    await Promise.all([
+      prisma.user.count({ where: { communityId } }),
+      prisma.user.count({ where: { communityId, isVerifiedProvider: true } }),
+      prisma.listing.count({ where: { communityId } }),
+      prisma.listing.count({ where: { communityId, type: "tool" } }),
+      prisma.report.count({ where: { communityId, status: "pending" } }),
+    ]);
+  return { totalUsers, verifiedProviders, totalListings, totalTools, pendingReports };
+}
 
-export default function AdminPage() {
-  const totalProviders = PROVIDERS.length;
-  const verifiedProviders = PROVIDERS.filter((p) => p.verified).length;
-  const totalListings = MARKET_ITEMS.length;
-  const totalTools = TOOLS.length;
-  const pendingReports = REPORTS.filter((r) => r.status === "pending").length;
+export default async function AdminPage() {
+  const { totalUsers, verifiedProviders, totalListings, totalTools, pendingReports } =
+    await getStats();
 
   return (
     <main>
@@ -21,9 +28,9 @@ export default function AdminPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {[
-            { label: "Miembros", value: totalProviders, icon: "👥", color: "border-blue-200" },
+            { label: "Miembros", value: totalUsers, icon: "👥", color: "border-blue-200" },
             { label: "Verificados", value: verifiedProviders, icon: "✅", color: "border-green-200" },
-            { label: "Anuncios", value: totalListings, icon: "📋", color: "border-purple-200" },
+            { label: "Publicaciones", value: totalListings, icon: "📋", color: "border-purple-200" },
             { label: "Herramientas", value: totalTools, icon: "🔨", color: "border-yellow-200" },
             { label: "Reportes pendientes", value: pendingReports, icon: "⚠️", color: "border-red-200" },
           ].map(({ label, value, icon, color }) => (
@@ -38,95 +45,11 @@ export default function AdminPage() {
         <AdminListingsPanel />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Reportes pendientes */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">⚠️ Reportes pendientes</h2>
-            <div className="space-y-3">
-              {REPORTS.map((r) => (
-                <div key={r.id} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-sm text-gray-800">{r.target}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Reportado por: {r.reporter}</p>
-                      <p className="text-xs text-gray-500">Motivo: {r.reason}</p>
-                      <p className="text-xs text-gray-400 mt-1">{r.date}</p>
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                      r.status === "pending" ? "bg-red-100 text-red-600" : "bg-green-100 text-green-700"
-                    }`}>
-                      {r.status === "pending" ? "Pendiente" : "Resuelto"}
-                    </span>
-                  </div>
-                  {r.status === "pending" && (
-                    <div className="flex gap-2 mt-3">
-                      <button className="flex-1 bg-red-600 text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-red-700 transition-colors min-h-[44px]">
-                        Suspender usuario
-                      </button>
-                      <button className="flex-1 border border-gray-300 text-gray-600 text-xs font-semibold py-1.5 rounded-lg hover:bg-gray-50 transition-colors min-h-[44px]">
-                        Desestimar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
+          <AdminReportsPanel />
           <AdminCategoriesPanel />
         </div>
 
-        {/* Miembros */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">👥 Miembros de la comunidad</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 px-3 text-gray-500 font-semibold">Miembro</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-semibold">Vereda</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-semibold">Categoría</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-semibold">Rating</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-semibold">Estado</th>
-                  <th className="py-2 px-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {PROVIDERS.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-3 px-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{p.avatar}</span>
-                        <span className="font-medium text-gray-800">{p.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-gray-500">{p.vereda}</td>
-                    <td className="py-3 px-3 text-gray-500">{p.category}</td>
-                    <td className="py-3 px-3">⭐ {p.rating}</td>
-                    <td className="py-3 px-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        p.verified ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                      }`}>
-                        {p.verified ? "✓ Verificado" : "Sin verificar"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="flex gap-1">
-                        {!p.verified && (
-                          <button className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition-colors min-h-[44px]">
-                            Verificar
-                          </button>
-                        )}
-                        <button className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-lg hover:bg-red-100 transition-colors min-h-[44px]">
-                          Suspender
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <AdminMembersPanel />
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Errors } from "@/lib/api/errors";
+import { requireAdminSessionFromRequest } from "@/lib/admin/session";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -16,10 +17,8 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const { id } = await context.params;
 
-  const adminId = request.headers.get("X-Admin-ID");
-  if (!adminId) {
-    return Errors.unauthorized("Se requiere X-Admin-ID");
-  }
+  const adminSession = await requireAdminSessionFromRequest(request);
+  if (!adminSession) return Errors.unauthorized("Sesión de administrador requerida");
 
   // Check member exists
   let existing: { id: string } | null;

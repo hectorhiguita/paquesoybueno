@@ -12,6 +12,7 @@ interface UserProfile {
   name: string;
   email: string;
   phone: string | null;
+  phoneVerified: boolean;
   role: string;
   isVerifiedProvider: boolean;
   avatarUrl: string | null;
@@ -25,7 +26,7 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
     return await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true, name: true, email: true, phone: true, role: true,
+        id: true, name: true, email: true, phone: true, phoneVerified: true, role: true,
         isVerifiedProvider: true, avatarUrl: true, veredaId: true,
         homeVereda: { select: { id: true, name: true } },
         _count: { select: { ratingsReceived: true } },
@@ -34,7 +35,7 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
   } catch {
     const basic = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, phone: true, role: true, isVerifiedProvider: true },
+      select: { id: true, name: true, email: true, phone: true, phoneVerified: true, role: true, isVerifiedProvider: true },
     });
     if (!basic) return null;
     return { ...basic, avatarUrl: null, veredaId: null, homeVereda: null, _count: { ratingsReceived: 0 } };
@@ -44,7 +45,6 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
 export default async function DashboardPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.requiresPhoneVerification) redirect("/complete-profile");
 
   const userId = session.user.id;
   const communityId = session.communityId;
@@ -83,6 +83,8 @@ export default async function DashboardPage() {
   ]);
 
   if (!user) redirect("/login");
+  // Check DB directly — JWT can be stale right after Google OAuth registration
+  if (!user.phoneVerified) redirect("/complete-profile");
 
   const avgRatingResult = await prisma.rating.aggregate({
     where: { providerId: userId, communityId },

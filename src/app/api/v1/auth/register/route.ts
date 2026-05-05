@@ -123,7 +123,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Generar token de activación de único uso (24h)
   const token = await generateActivationToken(userId, normalizedEmail, communityId);
-  const baseUrl = process.env.NEXTAUTH_URL ?? "https://santaelenacomunidad.online";
+  // Prefer NEXT_PUBLIC_APP_URL (always https) over NEXTAUTH_URL (may be http in some envs)
+  const rawBase =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXTAUTH_URL ??
+    "https://santaelenacomunidad.online";
+  const baseUrl = rawBase.replace(/^http:\/\//, "https://");
   const activationUrl = `${baseUrl}/activate?token=${token}`;
 
   // Enviar email con el link

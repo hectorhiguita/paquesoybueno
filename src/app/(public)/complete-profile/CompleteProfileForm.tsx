@@ -30,8 +30,10 @@ export function CompleteProfileForm({ veredas }: { veredas: Vereda[] }) {
       return;
     }
     if (sessionStatus === "authenticated") {
-      if (!session?.requiresPhoneVerification) {
-        router.push("/dashboard");
+      // Only redirect if the session explicitly says verification is NOT required.
+      // Avoid redirecting when requiresPhoneVerification is undefined (session still loading).
+      if (session?.requiresPhoneVerification === false) {
+        window.location.href = "/dashboard";
         return;
       }
       const googleName = (session as unknown as Record<string, unknown>).googleName as string | undefined;
@@ -68,7 +70,9 @@ export function CompleteProfileForm({ veredas }: { veredas: Vereda[] }) {
 
       await update();
       setStep("done");
-      setTimeout(() => router.push("/dashboard"), 1500);
+      // Hard redirect ensures the server reads the fresh JWT cookie with phoneVerified=true.
+      // router.push() (SPA navigation) can arrive before the updated cookie propagates.
+      setTimeout(() => { window.location.href = "/dashboard"; }, 1500);
     } catch {
       setError("Error de conexión");
       setStatus("error");

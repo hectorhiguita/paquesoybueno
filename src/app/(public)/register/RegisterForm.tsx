@@ -9,6 +9,57 @@ import { Select } from "@/components/ui/Select";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import type { SelectOption } from "@/types/api";
 
+function ActivationSentScreen({ email }: { email: string }) {
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle");
+
+  const handleResend = async () => {
+    setResendStatus("sending");
+    try {
+      await fetch("/api/v1/auth/activate/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } finally {
+      setResendStatus("sent");
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md w-full text-center">
+        <div className="text-5xl mb-4">📧</div>
+        <h2 className="text-2xl font-bold text-gray-800">¡Revisa tu correo!</h2>
+        <p className="text-gray-500 text-sm mt-3 leading-relaxed">
+          Te enviamos un enlace a <strong>{email}</strong> para activar tu cuenta y crear tu contraseña.
+        </p>
+        <p className="text-gray-400 text-xs mt-2">El enlace expira en 24 horas. Revisa también tu carpeta de spam.</p>
+
+        <div className="mt-6 space-y-3">
+          <Link
+            href="/login"
+            className="inline-flex w-full items-center justify-center border border-gray-300 text-gray-700 font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors min-h-[44px]"
+          >
+            Ir al inicio de sesión
+          </Link>
+
+          {resendStatus === "sent" ? (
+            <p className="text-sm text-green-700 font-medium py-2">✓ Correo reenviado. Revisa tu bandeja de spam.</p>
+          ) : (
+            <button
+              onClick={handleResend}
+              disabled={resendStatus === "sending"}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 py-2 disabled:opacity-40 transition-colors"
+            >
+              {resendStatus === "sending" ? "Reenviando..." : "¿No llegó? Reenviar correo"}
+            </button>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+
 const STEPS = ["Datos personales", "Tu vereda", "Confirmar"] as const;
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -64,24 +115,7 @@ export function RegisterForm({ veredas, googleEnabled = false }: { veredas: Sele
   };
 
   if (status === "success") {
-    return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md w-full text-center">
-          <div className="text-5xl mb-4">📧</div>
-          <h2 className="text-2xl font-bold text-gray-800">¡Revisa tu correo!</h2>
-          <p className="text-gray-500 text-sm mt-3 leading-relaxed">
-            Te enviamos un enlace a <strong>{form.email}</strong> para activar tu cuenta y crear tu contraseña.
-          </p>
-          <p className="text-gray-500 text-xs mt-3">El enlace expira en 24 horas.</p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center mt-6 border border-gray-300 text-gray-700 font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors min-h-[44px]"
-          >
-            Ir al inicio de sesión
-          </Link>
-        </div>
-      </main>
-    );
+    return <ActivationSentScreen email={form.email} />;
   }
 
   const veredaLabel = veredas.find((v) => v.value === form.veredaId)?.label ?? "—";

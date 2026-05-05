@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
-type State = "loading" | "valid" | "invalid" | "submitting" | "success" | "error";
+type State = "loading" | "valid" | "invalid" | "submitting" | "success" | "resend";
 
 function ActivateForm() {
   const params = useSearchParams();
@@ -21,6 +21,8 @@ function ActivateForm() {
   const [otpRequired, setOtpRequired] = useState(false);
   const [maskedPhone, setMaskedPhone] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle");
 
   useEffect(() => {
     if (!token) { setState("invalid"); return; }
@@ -98,20 +100,58 @@ function ActivateForm() {
     );
   }
 
+  const handleResend = async () => {
+    if (!resendEmail.includes("@")) return;
+    setResendStatus("sending");
+    try {
+      await fetch("/api/v1/auth/activate/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+    } finally {
+      setResendStatus("sent");
+    }
+  };
+
   if (state === "invalid") {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md w-full text-center">
           <div className="text-5xl mb-4">❌</div>
-          <h2 className="text-xl font-bold text-gray-800">Enlace inválido</h2>
-          <p className="text-gray-500 text-sm mt-2">
-            Este enlace de activación ya fue utilizado o ha expirado.
+          <h2 className="text-xl font-bold text-gray-800">Enlace inválido o expirado</h2>
+          <p className="text-gray-500 text-sm mt-2 mb-6">
+            Este enlace ya fue utilizado o expiró. Ingresa tu correo para recibir uno nuevo.
           </p>
+
+          {resendStatus === "sent" ? (
+            <p className="text-sm text-green-700 font-medium bg-green-50 border border-green-200 rounded-xl p-4">
+              ✓ Si tu cuenta existe y no está activada, recibirás un nuevo enlace. Revisa también tu carpeta de spam.
+            </p>
+          ) : (
+            <div className="space-y-3 text-left">
+              <Input
+                label="Tu correo electrónico"
+                type="email"
+                placeholder="correo@ejemplo.com"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+              />
+              <Button
+                className="w-full"
+                disabled={!resendEmail.includes("@") || resendStatus === "sending"}
+                onClick={handleResend}
+              >
+                {resendStatus === "sending" ? "Enviando..." : "Enviar nuevo enlace"}
+              </Button>
+            </div>
+          )}
+
           <Link
             href="/register"
-            className="inline-flex items-center justify-center mt-6 bg-green-700 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-800 transition-colors min-h-[44px]"
+            className="inline-block mt-4 text-sm text-gray-400 hover:text-gray-600 hover:underline"
           >
-            Registrarme de nuevo
+            Registrarme con otro correo
           </Link>
         </div>
       </main>
