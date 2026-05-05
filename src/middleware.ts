@@ -19,8 +19,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const isAdminApi = pathname.startsWith("/api/v1/admin");
   const isAdminLogin = pathname === "/admin/login" || pathname === "/api/v1/admin/auth/login";
   const isAdminLogout = pathname === "/api/v1/admin/auth/logout";
+  const isAdminPromote = pathname === "/api/v1/admin/auth/promote";
 
-  if ((isAdminPage || isAdminApi) && !isAdminLogin && !isAdminLogout) {
+  if ((isAdminPage || isAdminApi) && !isAdminLogin && !isAdminLogout && !isAdminPromote) {
     const sessionToken = request.cookies.get("admin_session")?.value;
     const session = await verifyAdminSession(sessionToken);
 
