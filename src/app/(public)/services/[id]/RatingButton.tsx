@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 
 interface Props {
   providerId: string;
@@ -46,6 +47,7 @@ export function RatingButton({ providerId, listingId, userId }: Props) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Community-ID": SANTA_ELENA_COMMUNITY_ID,
           "X-User-ID": userId,
         },
         body: JSON.stringify({
