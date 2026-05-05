@@ -3,10 +3,13 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SANTA_ELENA_COMMUNITY_ID } from "@/lib/constants";
 import { isSafeImageUrl } from "@/lib/utils/image";
+import { auth } from "@/lib/auth/config";
+import { RatingButton } from "./RatingButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function ServiceDetailPage({ params }: { params: { id: string } }) {
+  const session = await auth();
   const listing = await prisma.listing.findFirst({
     where: { id: params.id, communityId: SANTA_ELENA_COMMUNITY_ID, type: "service" },
     include: {
@@ -165,12 +168,11 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
             >
               ✉️ Mensaje interno
             </Link>
-            <Link
-              href="/register"
-              className="bg-green-700 text-white font-semibold text-sm py-2.5 rounded-xl hover:bg-green-800 transition-colors min-h-[44px] flex items-center justify-center gap-2"
-            >
-              ⭐ Calificar
-            </Link>
+            <RatingButton
+              providerId={listing.author.id}
+              listingId={listing.id}
+              userId={session?.user?.id ?? null}
+            />
           </div>
         </div>
 
@@ -200,11 +202,13 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
                 </div>
               ))}
             </div>
-            <div className="mt-5 pt-4 border-t border-gray-100">
-              <Link href="/login" className="text-sm text-green-700 font-medium hover:underline">
-                + Dejar una reseña (requiere cuenta)
-              </Link>
-            </div>
+            {!session?.user && (
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <Link href="/register" className="text-sm text-green-700 font-medium hover:underline">
+                  + Dejar una reseña (requiere cuenta)
+                </Link>
+              </div>
+            )}
           </div>
         )}
 

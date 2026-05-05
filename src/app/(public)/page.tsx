@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Footer } from "@/components/layout/Footer";
+import { HeroCTA } from "./HeroCTA";
 
 const SERVICE_CATEGORIES = [
   { icon: "🌿", label: "Jardinería", href: "/services?category=jardineria" },
@@ -40,20 +41,7 @@ export default function HomePage() {
         <p className="text-green-100 text-lg max-w-xl mx-auto mb-8">
           Conectamos a los vecinos de Santa Elena para compartir servicios, intercambiar bienes y construir comunidad.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            href="/register"
-            className="bg-white text-green-700 font-bold px-8 py-3 rounded-xl hover:bg-green-50 transition-colors min-h-[44px] flex items-center justify-center text-base"
-          >
-            Únete gratis
-          </Link>
-          <Link
-            href="/services"
-            className="border-2 border-white text-white font-semibold px-8 py-3 rounded-xl hover:bg-green-600 transition-colors min-h-[44px] flex items-center justify-center text-base"
-          >
-            Ver servicios
-          </Link>
-        </div>
+        <HeroCTA />
       </section>
 
       {/* Servicios por categoría */}
