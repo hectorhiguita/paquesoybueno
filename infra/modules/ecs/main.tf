@@ -184,14 +184,10 @@ resource "aws_ecs_task_definition" "migrate" {
       cpu       = 512
       memory    = 512
 
-      # entryPoint sobreescribe el ENTRYPOINT del Dockerfile (docker-entrypoint.sh)
-      # para que command llegue directamente a node sin pasar por el script.
-      entryPoint = ["node"]
-      command = [
-        "./node_modules/prisma/build/index.js",
-        "migrate",
-        "deploy"
-      ]
+      # Ejecuta el script de migraciones que hace baseline de la historia
+      # antes de correr prisma migrate deploy.
+      entryPoint = ["/bin/sh"]
+      command    = ["scripts/run-migrations.sh"]
 
       environment = [
         { name = "NODE_ENV", value = "production" }

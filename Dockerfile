@@ -65,9 +65,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Script de inicio
+# Scripts de inicio y migraciones
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+COPY --chown=nextjs:nodejs scripts/run-migrations.sh ./scripts/run-migrations.sh
+RUN chmod +x docker-entrypoint.sh scripts/run-migrations.sh
 
 USER nextjs
 
