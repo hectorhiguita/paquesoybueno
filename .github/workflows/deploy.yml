@@ -124,10 +124,17 @@ jobs:
             --cluster "${{ env.ECS_CLUSTER }}" \
             --tasks "$TASK_ARN"
 
-          echo "── CloudWatch logs ──────────────────────────────────────"
+          echo "── Diagnóstico de task definition ───────────────────────"
+          aws ecs describe-task-definition \
+            --task-definition santa-elena-migrate-prod \
+            --query 'taskDefinition.containerDefinitions[0].{entryPoint:entryPoint,command:command,image:image}' \
+            --output json
+
+          echo "── CloudWatch logs (migrate/migrate/TASK_ID) ────────────"
+          sleep 10
           aws logs get-log-events \
             --log-group-name "/ecs/santa-elena-app-prod" \
-            --log-stream-name "migrate/${TASK_ID}" \
+            --log-stream-name "migrate/migrate/${TASK_ID}" \
             --query 'events[].message' \
             --output text 2>/dev/null || echo "(sin logs disponibles)"
           echo "─────────────────────────────────────────────────────────"
