@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Footer } from "@/components/layout/Footer";
 
 const SERVICE_CATEGORIES = [
   { icon: "🌿", label: "Jardinería", href: "/services?category=jardineria" },
@@ -121,6 +122,8 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      <Footer />
     </main>
   );
 }

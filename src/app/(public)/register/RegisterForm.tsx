@@ -157,6 +157,13 @@ export function RegisterForm({ veredas, googleEnabled = false }: { veredas: Sele
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900 leading-relaxed">
                 📧 Te enviaremos un enlace a <strong>{form.email}</strong> para crear tu contraseña.
               </div>
+              <p className="text-xs text-gray-400 text-center leading-relaxed">
+                Al crear tu cuenta aceptas nuestros{" "}
+                <Link href="/terminos" className="text-green-700 hover:underline font-medium" target="_blank">
+                  Términos y Condiciones
+                </Link>
+                .
+              </p>
               {status === "error" && (
                 <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 leading-relaxed">{errorMsg}</p>
               )}
