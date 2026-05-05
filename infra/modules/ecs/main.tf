@@ -244,8 +244,10 @@ resource "aws_ecs_task_definition" "app" {
       }]
 
       environment = [
-        { name = "NODE_ENV", value = "production" },
-        { name = "PORT", value = "3000" }
+        { name = "NODE_ENV",        value = "production" },
+        { name = "PORT",            value = "3000" },
+        { name = "S3_BUCKET_NAME",  value = var.assets_bucket_name },
+        { name = "AWS_REGION",      value = var.aws_region }
       ]
 
       secrets = [

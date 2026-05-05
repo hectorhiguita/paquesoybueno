@@ -61,3 +61,8 @@ variable "public_subnet_ids" {
   type        = list(string)
   description = "Subnets públicas para el ASG — requieren salida a internet para que el agente ECS registre."
 }
+
+variable "assets_bucket_name" {
+  type        = string
+  description = "Nombre del bucket S3 de assets (imágenes y avatares)."
+}

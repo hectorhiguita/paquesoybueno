@@ -44,7 +44,10 @@ resource "aws_s3_bucket_policy" "assets_public_read" {
       Effect    = "Allow"
       Principal = "*"
       Action    = "s3:GetObject"
-      Resource  = "${aws_s3_bucket.assets.arn}/public/*"
+      Resource  = [
+        "${aws_s3_bucket.assets.arn}/public/*",
+        "${aws_s3_bucket.assets.arn}/avatars/*"
+      ]
     }]
   })
 

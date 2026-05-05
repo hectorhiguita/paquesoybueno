@@ -124,4 +124,5 @@ module "ecs" {
   ecs_exec_role_arn    = module.iam.ecs_exec_role_arn
   log_group_app        = module.cloudwatch.log_group_app
   ecs_cluster_name     = "practicas-itm"
+  assets_bucket_name   = module.s3.assets_bucket_name
 }
