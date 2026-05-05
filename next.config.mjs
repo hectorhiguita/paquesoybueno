@@ -27,15 +27,7 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
-      // Cloudflare R2 — endpoint interno (uploads vía SDK)
-      { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
-      // Cloudflare R2 — URL pública r2.dev (cuando public access está habilitado)
-      { protocol: "https", hostname: "*.r2.dev" },
-      // Dominio personalizado configurado en R2 / CDN
-      ...(process.env.R2_PUBLIC_HOSTNAME
-        ? [{ protocol: "https", hostname: process.env.R2_PUBLIC_HOSTNAME }]
-        : []),
-      // AWS S3 / SES assets
+      // AWS S3 — imágenes de listings y avatares de usuarios
       { protocol: "https", hostname: "*.amazonaws.com" },
       { protocol: "https", hostname: "*.s3.amazonaws.com" },
     ],
