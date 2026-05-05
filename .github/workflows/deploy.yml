@@ -118,10 +118,19 @@ jobs:
             --output text)
 
           echo "Migration task: $TASK_ARN"
+          TASK_ID=$(basename "$TASK_ARN")
 
           aws ecs wait tasks-stopped \
             --cluster "${{ env.ECS_CLUSTER }}" \
             --tasks "$TASK_ARN"
+
+          echo "── CloudWatch logs ──────────────────────────────────────"
+          aws logs get-log-events \
+            --log-group-name "/ecs/santa-elena-app-prod" \
+            --log-stream-name "migrate/${TASK_ID}" \
+            --query 'events[].message' \
+            --output text 2>/dev/null || echo "(sin logs disponibles)"
+          echo "─────────────────────────────────────────────────────────"
 
           EXIT_CODE=$(aws ecs describe-tasks \
             --cluster "${{ env.ECS_CLUSTER }}" \
@@ -129,7 +138,13 @@ jobs:
             --query 'tasks[0].containers[0].exitCode' \
             --output text)
 
-          echo "Exit code: $EXIT_CODE"
+          STOPPED_REASON=$(aws ecs describe-tasks \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].stoppedReason' \
+            --output text)
+
+          echo "Exit code: $EXIT_CODE — Reason: $STOPPED_REASON"
           if [ "$EXIT_CODE" != "0" ]; then
             echo "❌ Migración falló (exit $EXIT_CODE)"
             exit 1
