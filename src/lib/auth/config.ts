@@ -145,6 +145,20 @@ export const authConfig: NextAuthConfig = {
         token.phoneVerified = appUser.phoneVerified;
       }
 
+      // Heal old tokens missing communityId (e.g. sessions created before this field was added)
+      if (!token.communityId && token.userId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.userId as string },
+          select: { communityId: true, role: true, isVerifiedProvider: true, phoneVerified: true },
+        });
+        if (dbUser) {
+          token.communityId = dbUser.communityId;
+          token.role = dbUser.role as "member" | "admin";
+          token.isVerifiedProvider = dbUser.isVerifiedProvider;
+          token.phoneVerified = dbUser.phoneVerified;
+        }
+      }
+
       // Google OAuth first login: sync DB user (Req 1.8)
       if (account?.provider === "google" && user) {
         const dbUser = await prisma.user.findFirst({
