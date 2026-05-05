@@ -249,12 +249,13 @@ export const authConfig: NextAuthConfig = {
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.userId;
+        // Fall back to token.sub (set by NextAuth for all providers) when userId is missing
+        session.user.id = (token.userId as string | undefined) || (token.sub as string | undefined) || "";
       }
       session.communityId = token.communityId;
-      session.role = token.role;
-      session.isVerifiedProvider = token.isVerifiedProvider;
-      session.phoneVerified = token.phoneVerified;
+      session.role = token.role ?? "member";
+      session.isVerifiedProvider = token.isVerifiedProvider ?? false;
+      session.phoneVerified = token.phoneVerified ?? false;
       session.requiresPhoneVerification = token.requiresPhoneVerification;
       return session;
     },

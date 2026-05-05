@@ -18,11 +18,27 @@ export async function getSessionContext(
   }
 
   const { auth } = await import("@/lib/auth/config");
-  const session = await auth();
-  const userId = session?.user?.id;
-  const role = session?.role ?? "member";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let session: any;
+  try {
+    session = await auth();
+  } catch (err) {
+    console.error("[getSessionContext] auth() threw:", err);
+    return null;
+  }
 
-  if (!userId) return null;
+  const userId: string | undefined = session?.user?.id || undefined;
+  const role: "member" | "admin" = session?.role ?? "member";
+
+  if (!userId) {
+    console.error("[getSessionContext] no userId — session:", JSON.stringify({
+      hasUser: !!session?.user,
+      userId: session?.user?.id,
+      communityId: session?.communityId,
+      role: session?.role,
+    }));
+    return null;
+  }
 
   let communityId: string | undefined = session?.communityId;
 
@@ -35,12 +51,15 @@ export async function getSessionContext(
         select: { communityId: true },
       });
       communityId = dbUser?.communityId;
-    } catch {
-      // Non-fatal: if DB lookup fails, treat as unauthenticated
+    } catch (err) {
+      console.error("[getSessionContext] communityId fallback DB error:", err);
     }
   }
 
-  if (!communityId) return null;
+  if (!communityId) {
+    console.error("[getSessionContext] no communityId for userId:", userId);
+    return null;
+  }
 
   return { userId, communityId, role };
 }
