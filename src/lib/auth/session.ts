@@ -20,12 +20,27 @@ export async function getSessionContext(
   const { auth } = await import("@/lib/auth/config");
   const session = await auth();
   const userId = session?.user?.id;
-  const communityId = session?.communityId;
   const role = session?.role ?? "member";
 
-  if (!userId || !communityId) {
-    return null;
+  if (!userId) return null;
+
+  let communityId: string | undefined = session?.communityId;
+
+  // Fallback for old JWT tokens that were created before communityId was stored in the token
+  if (!communityId) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { communityId: true },
+      });
+      communityId = dbUser?.communityId;
+    } catch {
+      // Non-fatal: if DB lookup fails, treat as unauthenticated
+    }
   }
+
+  if (!communityId) return null;
 
   return { userId, communityId, role };
 }

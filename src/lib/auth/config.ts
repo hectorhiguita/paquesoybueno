@@ -145,17 +145,24 @@ export const authConfig: NextAuthConfig = {
         token.phoneVerified = appUser.phoneVerified;
       }
 
-      // Heal old tokens missing communityId (e.g. sessions created before this field was added)
-      if (!token.communityId && token.userId) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.userId as string },
-          select: { communityId: true, role: true, isVerifiedProvider: true, phoneVerified: true },
-        });
-        if (dbUser) {
-          token.communityId = dbUser.communityId;
-          token.role = dbUser.role as "member" | "admin";
-          token.isVerifiedProvider = dbUser.isVerifiedProvider;
-          token.phoneVerified = dbUser.phoneVerified;
+      // Heal old tokens missing communityId or userId (sessions created before these fields were added).
+      // Falls back to token.sub which NextAuth always sets to the user ID.
+      const uid = (token.userId as string | undefined) || (token.sub as string | undefined);
+      if (uid && (!token.communityId || !token.userId)) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: uid },
+            select: { communityId: true, role: true, isVerifiedProvider: true, phoneVerified: true },
+          });
+          if (dbUser) {
+            token.userId = uid;
+            token.communityId = dbUser.communityId;
+            token.role = dbUser.role as "member" | "admin";
+            token.isVerifiedProvider = dbUser.isVerifiedProvider;
+            token.phoneVerified = dbUser.phoneVerified;
+          }
+        } catch {
+          // Non-fatal: token stays as-is
         }
       }
 
