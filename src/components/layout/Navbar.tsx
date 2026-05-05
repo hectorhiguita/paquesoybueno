@@ -7,6 +7,7 @@ const PUBLIC_LINKS = [
   { href: "/services", label: "Servicios" },
   { href: "/marketplace", label: "Marketplace" },
   { href: "/tools", label: "Herramientas" },
+  { href: "/terminos", label: "Términos y Condiciones" },
 ];
 
 export function Navbar() {
