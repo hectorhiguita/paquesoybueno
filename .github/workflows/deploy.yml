@@ -108,6 +108,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
 
+      - name: Ejecutar migraciones de base de datos
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --task-definition santa-elena-migrate-prod \
+            --count 1 \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task: $TASK_ARN"
+
+          aws ecs wait tasks-stopped \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          echo "Exit code: $EXIT_CODE"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ Migración falló (exit $EXIT_CODE)"
+            exit 1
+          fi
+          echo "✅ Migraciones aplicadas"
+
       - name: Verificar task definition activa del servicio
         run: |
           aws ecs describe-services \
