@@ -20,6 +20,10 @@ export async function PATCH(
   const adminSession = await requireAdminSessionFromRequest(request);
   if (!adminSession) return Errors.unauthorized("Sesión de administrador requerida");
 
+  // Use the X-Admin-ID header value as verifiedBy when present (UUID required by schema).
+  // Cookie-based sessions have no real admin UUID, so verifiedBy stays null.
+  const verifiedBy = request.headers.get("X-Admin-ID") || null;
+
   // Parse body
   let body: unknown;
   try {
@@ -60,6 +64,7 @@ export async function PATCH(
       data: {
         isVerifiedProvider: true,
         verifiedAt: new Date(),
+        verifiedBy,
         verificationReason: reason.trim(),
       },
       select: {
