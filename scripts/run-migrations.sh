@@ -25,6 +25,18 @@ for name in \
     || echo "  · ya registrada: $name"
 done
 
+# ── Limpiar migraciones fallidas ───────────────────────────────────────────────
+# Si una migración quedó en estado "failed" en _prisma_migrations (por un error
+# en una corrida anterior), Prisma bloquea todo deploy. La marcamos como
+# rolled-back para que pueda reintentarse limpiamente.
+echo "→ Verificando migraciones fallidas..."
+for name in \
+  "0011_clear_localhost_avatar_urls"; do
+  $PRISMA migrate resolve --rolled-back "$name" 2>/dev/null \
+    && echo "  · reset a rolled-back: $name" \
+    || echo "  · sin fallo previo: $name"
+done
+
 # ── Deploy ─────────────────────────────────────────────────────────────────────
 # Solo aplicará las migraciones nuevas (0011+) que no estén en _prisma_migrations.
 echo "→ Desplegando migraciones pendientes..."
