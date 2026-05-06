@@ -9,6 +9,7 @@ on:
       - "public/**"
       - "Dockerfile"
       - "docker-entrypoint.sh"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "next.config.mjs"
